@@ -1,0 +1,23 @@
+{
+  "account": {
+    "email": "your@email.com",
+    "password": "your_password"
+  },
+  "monitor": {
+    "symbols": ["AAPL", "TSM", "IONQ"],
+    "intervalMinutes": 5,
+    "lookbackMinutes": 30,
+    "runAllDay": true
+  },
+  "rules": {
+    "minBuyScoreForEntry": 45,
+    "minBuyScoreForStrongEntry": 70
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 14587
+  },
+  "ui": {
+    "language": "zh-CN"
+  }
+}

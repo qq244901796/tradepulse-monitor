@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradePulse Monitor</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>TradePulse Monitor</h1>
+      <p id="subtitle" data-i18n="subtitle">本地机构入场监控</p>
+    </div>
+    <div class="actions">
+      <label class="language-select">
+        <span data-i18n="language">语言</span>
+        <select id="languageSelect">
+          <option value="zh-CN">中文</option>
+          <option value="en-US">English</option>
+        </select>
+      </label>
+      <button id="settingsButton" type="button" data-i18n="settings">设置</button>
+      <button id="shutdown" type="button" data-i18n="shutdown">停止后台</button>
+      <button id="scanNow" type="button" class="primary" data-i18n="scanNow">立即扫描</button>
+    </div>
+  </header>
+
+  <main id="dashboard" class="layout">
+    <section id="settingsPanel" class="panel wide settings-panel hidden">
+      <div class="panel-head">
+        <div>
+          <h2 id="settingsTitle" data-i18n="settingsTitle">设置</h2>
+          <p id="settingsCopy" class="muted" data-i18n="settingsCopy">在软件里直接编辑配置，保存后会立即重新扫描。</p>
+        </div>
+        <button id="closeSettings" type="button" data-i18n="closeSettings">收起设置</button>
+      </div>
+      <div id="settingsError" class="warning hidden"></div>
+      <form id="settingsForm" class="setup-form settings-form">
+        <label>
+          <span data-i18n="email">TradePulse 邮箱</span>
+          <input id="configEmail" name="email" type="email" autocomplete="username" required>
+        </label>
+        <label>
+          <span data-i18n="password">TradePulse 密码</span>
+          <input id="configPassword" name="password" type="password" autocomplete="current-password">
+          <small data-i18n="passwordHelp">已有配置时不填表示保留当前密码。首次配置必须填写密码。</small>
+        </label>
+
+        <div class="symbol-editor">
+          <label for="symbolInput">
+            <span data-i18n="symbols">股票列表</span>
+          </label>
+          <div class="symbol-add-row">
+            <input id="symbolInput" type="text" data-i18n-placeholder="symbolPlaceholder" placeholder="输入 AAPL 后回车，可一次粘贴 AAPL,TSLA NVDA">
+            <button id="addSymbol" type="button" data-i18n="addSymbol">添加</button>
+          </div>
+          <div id="symbolTags" class="symbol-tags"></div>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span data-i18n="intervalMinutes">扫描周期（分钟）</span>
+            <input id="configInterval" name="intervalMinutes" type="number" min="1" value="5" required>
+          </label>
+          <label>
+            <span data-i18n="lookbackMinutes">回看分钟</span>
+            <input id="configLookback" name="lookbackMinutes" type="number" min="1" value="30" required>
+          </label>
+          <label>
+            <span data-i18n="entryScore">入场阈值</span>
+            <input id="configEntryScore" name="minBuyScoreForEntry" type="number" min="0" max="100" value="45" required>
+          </label>
+          <label>
+            <span data-i18n="strongScore">强入场阈值</span>
+            <input id="configStrongScore" name="minBuyScoreForStrongEntry" type="number" min="0" max="100" value="70" required>
+          </label>
+        </div>
+        <button id="saveSettings" type="submit" class="primary" data-i18n="saveSettings">保存设置并扫描</button>
+      </form>
+    </section>
+
+    <section class="panel status-panel monitor-panel">
+      <div class="panel-head">
+        <h2 data-i18n="runtimeStatus">运行状态</h2>
+        <span id="serviceStatus" class="badge" data-i18n="loading">读取中</span>
+      </div>
+      <div class="status-grid">
+        <div>
+          <span class="label" data-i18n="login">登录</span>
+          <strong id="loginStatus">-</strong>
+        </div>
+        <div>
+          <span class="label" data-i18n="lastScan">最近扫描</span>
+          <strong id="lastScan">-</strong>
+        </div>
+        <div>
+          <span class="label" data-i18n="nextScan">下次扫描</span>
+          <strong id="nextScan">-</strong>
+        </div>
+        <div>
+          <span class="label" data-i18n="tradeDate">数据日期</span>
+          <strong id="tradeDate">-</strong>
+        </div>
+      </div>
+      <div id="configWarning" class="warning hidden"></div>
+    </section>
+
+    <section class="panel monitor-panel">
+      <div class="panel-head">
+        <h2 data-i18n="signalSummary">信号概览</h2>
+        <span id="scanMeta" class="muted" data-i18n="noScan">暂无扫描</span>
+      </div>
+      <div id="summary" class="summary"></div>
+    </section>
+
+    <section class="panel wide monitor-panel">
+      <div class="panel-head">
+        <h2 data-i18n="watchlist">股票监控</h2>
+        <span id="symbolCount" class="muted">-</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="symbol">股票</th>
+              <th data-i18n="signal">信号</th>
+              <th data-i18n="buyScore">买入分</th>
+              <th data-i18n="sellScore">卖压分</th>
+              <th data-i18n="price">价格</th>
+              <th data-i18n="largeDeal">大单净额</th>
+              <th data-i18n="recentLargeDeal">最近大单</th>
+              <th data-i18n="reason">原因</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody">
+            <tr><td colspan="8" class="empty" data-i18n="waitingResults">等待扫描结果</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel monitor-panel">
+      <div class="panel-head">
+        <h2 data-i18n="config">配置</h2>
+        <span id="configPath" class="muted">-</span>
+      </div>
+      <dl class="kv">
+        <div><dt data-i18n="account">账号</dt><dd id="accountEmail">-</dd></div>
+        <div><dt data-i18n="symbols">股票列表</dt><dd id="watchSymbols">-</dd></div>
+        <div><dt data-i18n="interval">周期</dt><dd id="interval">-</dd></div>
+        <div><dt data-i18n="lookback">回看</dt><dd id="lookback">-</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel monitor-panel">
+      <div class="panel-head">
+        <h2 data-i18n="logs">最近日志</h2>
+        <span class="muted" data-i18n="autoRefresh">自动刷新</span>
+      </div>
+      <div id="logs" class="logs"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

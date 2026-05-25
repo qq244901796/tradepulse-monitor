@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="#F8FAFC"
+  android:fillViewport="true">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:gravity="center_vertical"
+      android:orientation="horizontal">
+
+      <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="TradePulse"
+          android:textColor="#101828"
+          android:textSize="24sp"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/stockCountText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="2dp"
+          android:text="请先完成配置"
+          android:textColor="#667085"
+          android:textSize="13sp" />
+      </LinearLayout>
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/historyButton"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:minWidth="0dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="历史"
+        android:textSize="13sp" />
+
+      <Space
+        android:layout_width="6dp"
+        android:layout_height="1dp" />
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/settingsButton"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:minWidth="0dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="设置"
+        android:textSize="13sp" />
+
+      <Space
+        android:layout_width="6dp"
+        android:layout_height="1dp" />
+
+      <com.google.android.material.button.MaterialButton
+        android:id="@+id/moreButton"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:minWidth="0dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:text="更多"
+        android:textSize="13sp" />
+    </LinearLayout>
+
+    <com.google.android.material.card.MaterialCardView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="14dp"
+      app:cardBackgroundColor="#FFFFFF"
+      app:cardCornerRadius="8dp"
+      app:strokeColor="#EAECF0"
+      app:strokeWidth="1dp">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center_vertical"
+          android:orientation="horizontal">
+
+          <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+              android:id="@+id/statusText"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:text="请先完成配置"
+              android:textColor="#101828"
+              android:textSize="21sp"
+              android:textStyle="bold" />
+
+            <TextView
+              android:id="@+id/lastScanText"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_marginTop="4dp"
+              android:text="尚未扫描"
+              android:textColor="#667085"
+              android:textSize="13sp" />
+          </LinearLayout>
+
+          <com.google.android.material.button.MaterialButton
+            android:id="@+id/scanButton"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:minWidth="0dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="扫描"
+            android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+          android:id="@+id/summaryText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="14dp"
+          android:background="#F2F4F7"
+          android:lineSpacingExtra="2dp"
+          android:padding="12dp"
+          android:text="填写账号、密码和股票后开始监控。"
+          android:textColor="#344054"
+          android:textSize="14sp" />
+      </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+      android:id="@+id/settingsPanel"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:visibility="gone"
+      app:cardBackgroundColor="#FFFFFF"
+      app:cardCornerRadius="8dp"
+      app:strokeColor="#EAECF0"
+      app:strokeWidth="1dp">
+
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:gravity="center_vertical"
+          android:orientation="horizontal">
+
+        <TextView
+          android:id="@+id/settingsTitleText"
+          android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="配置"
+            android:textColor="#101828"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+          <com.google.android.material.button.MaterialButton
+            android:id="@+id/closeSettingsButton"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="收起" />
+        </LinearLayout>
+
+        <TextView
+          android:id="@+id/settingsHintText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="保存并扫描成功后，配置会自动隐藏。"
+          android:textColor="#667085"
+          android:textSize="13sp" />
+
+        <TextView
+          android:id="@+id/securityText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="4dp"
+          android:textColor="#667085"
+          android:textSize="12sp" />
+
+        <TextView
+          android:id="@+id/emailLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="12dp"
+          android:text="TradePulse 邮箱"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <EditText
+          android:id="@+id/emailInput"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:hint="your@email.com"
+          android:inputType="textEmailAddress" />
+
+        <TextView
+          android:id="@+id/passwordLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="TradePulse 密码"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <EditText
+          android:id="@+id/passwordInput"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:hint="首次使用请输入密码；已配置可留空不改"
+          android:inputType="textPassword" />
+
+        <TextView
+          android:id="@+id/symbolsLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="股票列表"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/symbolsHelpText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="一次添加一个股票代码，不需要输入逗号。"
+          android:textColor="#667085"
+          android:textSize="12sp" />
+
+        <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="4dp"
+          android:gravity="center_vertical"
+          android:orientation="horizontal">
+
+          <EditText
+            android:id="@+id/stockSymbolInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="例如 AAPL"
+            android:inputType="textCapCharacters"
+            android:maxLines="1"
+            android:singleLine="true" />
+
+          <Space
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
+          <com.google.android.material.button.MaterialButton
+            android:id="@+id/addSymbolButton"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:minWidth="0dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="添加" />
+        </LinearLayout>
+
+        <LinearLayout
+          android:id="@+id/symbolsContainer"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:orientation="vertical" />
+
+        <TextView
+          android:id="@+id/intervalLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="12dp"
+          android:text="扫描周期（分钟）"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/intervalHelpText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="每隔几分钟自动刷新；安卓后台实际执行可能受系统省电影响。"
+          android:textColor="#667085"
+          android:textSize="12sp" />
+
+        <EditText
+          android:id="@+id/intervalInput"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:inputType="number"
+          android:text="5" />
+
+        <TextView
+          android:id="@+id/lookbackLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="回看分钟"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/lookbackHelpText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="判断最近多少分钟的大单变化，例如 30 表示最近 30 分钟。"
+          android:textColor="#667085"
+          android:textSize="12sp" />
+
+        <EditText
+          android:id="@+id/lookbackInput"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:inputType="number"
+          android:text="30" />
+
+        <TextView
+          android:id="@+id/entryScoreLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="入场阈值"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/entryScoreHelpText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="买入分达到多少算可能入场；默认 45。"
+          android:textColor="#667085"
+          android:textSize="12sp" />
+
+        <EditText
+          android:id="@+id/entryScoreInput"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:inputType="number"
+          android:text="45" />
+
+        <TextView
+          android:id="@+id/strongScoreLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="强入场阈值"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <TextView
+          android:id="@+id/strongScoreHelpText"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="买入分达到多少算强入场；默认 70。"
+          android:textColor="#667085"
+          android:textSize="12sp" />
+
+        <EditText
+          android:id="@+id/strongScoreInput"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:inputType="number"
+          android:text="70" />
+
+        <TextView
+          android:id="@+id/languageLabel"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="语言"
+          android:textColor="#344054"
+          android:textStyle="bold" />
+
+        <Spinner
+          android:id="@+id/languageSpinner"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="4dp" />
+
+        <CheckBox
+          android:id="@+id/notifyCheck"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:checked="true"
+          android:text="首次入场信号发本地通知" />
+
+        <com.google.android.material.button.MaterialButton
+          android:id="@+id/saveButton"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="12dp"
+          android:text="保存并开始监控" />
+      </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="18dp"
+      android:gravity="center_vertical"
+      android:orientation="horizontal">
+
+      <TextView
+        android:id="@+id/resultsTitleText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="重点结果"
+        android:textColor="#101828"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+      <TextView
+        android:id="@+id/resultsSubtitleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="优先显示入场和卖压"
+        android:textColor="#667085"
+        android:textSize="12sp" />
+    </LinearLayout>
+
+    <HorizontalScrollView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="10dp"
+      android:scrollbars="none">
+
+      <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+          android:id="@+id/filterAll"
+          style="?attr/materialButtonOutlinedStyle"
+          android:layout_width="wrap_content"
+          android:layout_height="38dp"
+          android:minWidth="0dp"
+          android:paddingStart="14dp"
+          android:paddingEnd="14dp"
+          android:text="全部"
+          android:textSize="13sp" />
+
+        <Space
+          android:layout_width="8dp"
+          android:layout_height="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+          android:id="@+id/filterEntry"
+          style="?attr/materialButtonOutlinedStyle"
+          android:layout_width="wrap_content"
+          android:layout_height="38dp"
+          android:minWidth="0dp"
+          android:paddingStart="14dp"
+          android:paddingEnd="14dp"
+          android:text="入场"
+          android:textSize="13sp" />
+
+        <Space
+          android:layout_width="8dp"
+          android:layout_height="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+          android:id="@+id/filterFirst"
+          style="?attr/materialButtonOutlinedStyle"
+          android:layout_width="wrap_content"
+          android:layout_height="38dp"
+          android:minWidth="0dp"
+          android:paddingStart="14dp"
+          android:paddingEnd="14dp"
+          android:text="首次"
+          android:textSize="13sp" />
+
+        <Space
+          android:layout_width="8dp"
+          android:layout_height="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+          android:id="@+id/filterSell"
+          style="?attr/materialButtonOutlinedStyle"
+          android:layout_width="wrap_content"
+          android:layout_height="38dp"
+          android:minWidth="0dp"
+          android:paddingStart="14dp"
+          android:paddingEnd="14dp"
+          android:text="卖压"
+          android:textSize="13sp" />
+      </LinearLayout>
+    </HorizontalScrollView>
+
+    <LinearLayout
+      android:id="@+id/resultsContainer"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="8dp"
+      android:orientation="vertical"
+      android:paddingBottom="12dp" />
+  </LinearLayout>
+</ScrollView>

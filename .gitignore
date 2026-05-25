@@ -1,0 +1,15 @@
+config/app.json
+data/
+dist/
+downloads/
+reports/
+node/
+.chrome-profile/
+.edge-profile/
+chrome-cookies.sqlite
+android/.gradle/
+android/.gradle-home/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
