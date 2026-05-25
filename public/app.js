@@ -12,6 +12,7 @@ const state = {
   setupMode: false,
   language: localStorage.getItem('language') || 'zh-CN',
   symbols: [],
+  pricePlan: null,
   settingsDirty: false,
 };
 
@@ -106,6 +107,7 @@ function readSettingsForm() {
       minBuyScoreForEntry: Number(document.getElementById('configEntryScore').value),
       minBuyScoreForStrongEntry: Number(document.getElementById('configStrongScore').value),
     },
+    pricePlan: state.pricePlan || undefined,
     server: {
       host: '127.0.0.1',
       port: 14587,
@@ -121,6 +123,7 @@ function populateSettings(status, force = false) {
   const config = status.publicConfig || {};
   const monitor = config.monitor || {};
   const rules = config.rules || {};
+  state.pricePlan = config.pricePlan || null;
   document.getElementById('configEmail').value = config.account?.email || '';
   document.getElementById('configPassword').value = '';
   document.getElementById('configInterval').value = monitor.intervalMinutes || 5;
@@ -309,7 +312,7 @@ function renderResults(scan) {
 
   const body = document.getElementById('resultsBody');
   if (!scan?.results?.length) {
-    body.innerHTML = `<tr><td colspan="8" class="empty">${t('waitingResults')}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" class="empty">${t('waitingResults')}</td></tr>`;
     return;
   }
 
@@ -334,10 +337,39 @@ function renderResults(scan) {
         <td class="metric">${price}</td>
         <td class="metric">${largeDeal}</td>
         <td class="metric">${recent}</td>
+        <td class="price-plan">${renderPricePlan(item.pricePlan)}</td>
         <td class="reason">${(item.reasons || []).slice(0, 4).map((reason) => translateReason(reason, state.language)).map(escapeHtml).join('<br>')}</td>
       </tr>
     `;
   }).join('');
+}
+
+function renderPricePlan(plan) {
+  if (!plan || plan.enabled === false || plan.status === 'NO_DATA') {
+    return `<span class="muted">${t(`pricePlanStatus${plan?.status || 'NO_DATA'}`)}</span>`;
+  }
+
+  const status = t(`pricePlanStatus${plan.status || 'LOW_CONFIDENCE'}`);
+  const source = plan.source === 'chart' ? t('pricePlanSourceChart') : t('pricePlanSourceExport');
+  const actionText = plan.actionable ? t('pricePlanActionable') : t('pricePlanNotActionable');
+  const reasons = (plan.reasons || [])
+    .slice(0, 2)
+    .map((item) => translateReason(item, state.language))
+    .map(escapeHtml)
+    .join('<br>');
+
+  return `
+    <div class="price-plan-box">
+      <div><strong>${escapeHtml(status)}</strong> / ${escapeHtml(actionText)}</div>
+      <div>${t('pricePlanWatch')}: <strong>${fixed(plan.watchPrice)}</strong></div>
+      <div>${t('pricePlanBuyZone')}: ${fixed(plan.buyZoneLow)} - ${fixed(plan.buyZoneHigh)}</div>
+      <div>${t('pricePlanBreakout')}: ${fixed(plan.confirmBreakoutPrice)}</div>
+      <div>${t('pricePlanStop')}: ${fixed(plan.riskStopPrice)}</div>
+      <div>${t('pricePlanConfidence')}: ${plan.confidenceScore || 0}/${plan.minConfidence || 60}</div>
+      <div>${t('pricePlanSource')}: ${escapeHtml(source)}</div>
+      ${reasons ? `<div class="muted">${reasons}</div>` : ''}
+    </div>
+  `;
 }
 
 function renderLogs(logs) {

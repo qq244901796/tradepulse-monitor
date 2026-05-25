@@ -62,10 +62,14 @@ class AndroidMonitorEngine(private val context: Context) {
       val latestDate = api.latestDate()
       val stockCsv = api.exportCsv(config.symbols.joinToString(","), latestDate, 0)
       val powerCsv = api.exportCsv("*", latestDate, 1)
+      val chartRowsBySymbol = config.symbols.associateWith { symbol ->
+        runCatching { api.chartRows(symbol) }.getOrDefault("[]")
+      }
       val rendered = core.analyze(
         tradeDate = toDisplayDate(latestDate),
         stockCsv = stockCsv,
         powerCsv = powerCsv,
+        chartRowsBySymbol = chartRowsBySymbol,
         config = config,
         seenSignals = store.loadSeenSignals(),
       )

@@ -106,6 +106,21 @@ class TradePulseApi(
     return text
   }
 
+  fun chartRows(symbol: String): String {
+    val url = "$DATA_ORIGIN/chart.do?sym=${URLEncoder.encode(symbol.uppercase(), Charsets.UTF_8.name())}"
+    val response = request(
+      url = url,
+      headers = mapOf(
+        "accept" to "application/json,*/*",
+        "referer" to "$APP_ORIGIN/chart",
+      ),
+    )
+    val text = response.body?.string().orEmpty()
+    check(response.isSuccessful) { "读取 Chart 曲线失败：HTTP ${response.code}" }
+    JSONArray(text)
+    return text
+  }
+
   private fun request(
     url: String,
     method: String = "GET",
@@ -142,6 +157,7 @@ class TradePulseApi(
       return listOf(
         api.probe("登录域名", "$AUTH_ORIGIN/trps/login"),
         api.probe("数据日期接口", "$DATA_ORIGIN/daily.enable.do"),
+        api.probe("Chart 曲线接口", "$DATA_ORIGIN/chart.do?sym=AAPL"),
         api.probe("导出页面", APP_EXPORT_URL),
       )
     }

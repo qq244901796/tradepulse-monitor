@@ -353,6 +353,40 @@ class MainActivity : AppCompatActivity() {
     content.addView(simpleText("${texts.largeDeal} ${item.largeDealText}", color = "#475467"))
     content.addView(simpleText("${texts.recentLargeDeal} ${item.recentLargeDealText}", color = "#475467"))
 
+    item.pricePlan?.let { plan ->
+      content.addView(
+        simpleText(
+          value = "${pricePlanLabel(texts, "title")}  ${plan.statusText} / ${plan.actionText}",
+          bold = true,
+          color = if (item.isEntrySignal) "#047857" else "#344054",
+        ),
+      )
+      content.addView(
+        simpleText(
+          value = "${pricePlanLabel(texts, "watch")} ${plan.watchPriceText}  |  ${pricePlanLabel(texts, "zone")} ${plan.buyZoneText}",
+          color = "#475467",
+          textSize = 13f,
+        ),
+      )
+      content.addView(
+        simpleText(
+          value = "${pricePlanLabel(texts, "breakout")} ${plan.breakoutText}  |  ${pricePlanLabel(texts, "stop")} ${plan.stopText}",
+          color = "#475467",
+          textSize = 13f,
+        ),
+      )
+      content.addView(
+        simpleText(
+          value = "${pricePlanLabel(texts, "confidence")} ${plan.confidenceText}  |  ${pricePlanLabel(texts, "source")} ${plan.sourceText}",
+          color = "#667085",
+          textSize = 13f,
+        ),
+      )
+      plan.reasons.take(2).forEach { reason ->
+        content.addView(simpleText("- $reason", color = "#667085", textSize = 13f))
+      }
+    }
+
     item.reasons.take(4).forEach { reason ->
       content.addView(simpleText("- $reason", color = "#667085", textSize = 13f))
     }
@@ -375,6 +409,20 @@ class MainActivity : AppCompatActivity() {
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT,
       )
+    }
+  }
+
+  private fun pricePlanLabel(texts: UiTexts, key: String): String {
+    val english = texts === UiTexts.EN
+    return when (key) {
+      "title" -> if (english) "Price Plan" else "\u4ef7\u683c\u8ba1\u5212"
+      "watch" -> if (english) "Watch" else "\u89c2\u5bdf\u4ef7"
+      "zone" -> if (english) "Zone" else "\u4e70\u5165\u533a\u95f4"
+      "breakout" -> if (english) "Breakout" else "\u7a81\u7834\u786e\u8ba4"
+      "stop" -> if (english) "Stop" else "\u98ce\u9669\u6b62\u635f"
+      "confidence" -> if (english) "Confidence" else "\u53ef\u4fe1\u5ea6"
+      "source" -> if (english) "Source" else "\u6570\u636e\u6e90"
+      else -> key
     }
   }
 
@@ -450,6 +498,10 @@ class MainActivity : AppCompatActivity() {
       lookbackMinutes = binding.lookbackInput.text?.toString()?.toIntOrNull() ?: 30,
       entryScore = binding.entryScoreInput.text?.toString()?.toIntOrNull() ?: 45,
       strongEntryScore = binding.strongScoreInput.text?.toString()?.toIntOrNull() ?: 70,
+      pricePlanEnabled = stored.pricePlanEnabled,
+      pricePullbackTolerancePct = stored.pricePullbackTolerancePct,
+      priceStopBufferPct = stored.priceStopBufferPct,
+      priceMinConfidence = stored.priceMinConfidence,
       language = if (binding.languageSpinner.selectedItemPosition == 1) "en-US" else "zh-CN",
       notifyEntrySignals = binding.notifyCheck.isChecked,
     )

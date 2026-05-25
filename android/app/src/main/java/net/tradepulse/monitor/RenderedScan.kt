@@ -51,6 +51,7 @@ data class ScanResultItem(
   val largeDealText: String,
   val recentLargeDealText: String,
   val reasons: List<String>,
+  val pricePlan: RenderedPricePlan?,
 ) {
   val isEntrySignal: Boolean
     get() = signal == "STRONG_ENTRY" || signal == "MIXED_ENTRY" || signal == "POSSIBLE_ENTRY"
@@ -70,6 +71,7 @@ data class ScanResultItem(
       .put("largeDealText", largeDealText)
       .put("recentLargeDealText", recentLargeDealText)
       .put("reasons", JSONArray(reasons))
+      .put("pricePlan", pricePlan?.toJson())
   }
 
   companion object {
@@ -84,6 +86,51 @@ data class ScanResultItem(
         priceText = json.optString("priceText"),
         largeDealText = json.optString("largeDealText"),
         recentLargeDealText = json.optString("recentLargeDealText"),
+        reasons = json.optJSONArray("reasons").toStringList(),
+        pricePlan = json.optJSONObject("pricePlan")?.let { RenderedPricePlan.fromJson(it) },
+      )
+    }
+  }
+}
+
+data class RenderedPricePlan(
+  val status: String,
+  val statusText: String,
+  val actionText: String,
+  val watchPriceText: String,
+  val buyZoneText: String,
+  val breakoutText: String,
+  val stopText: String,
+  val confidenceText: String,
+  val sourceText: String,
+  val reasons: List<String>,
+) {
+  fun toJson(): JSONObject {
+    return JSONObject()
+      .put("status", status)
+      .put("statusText", statusText)
+      .put("actionText", actionText)
+      .put("watchPriceText", watchPriceText)
+      .put("buyZoneText", buyZoneText)
+      .put("breakoutText", breakoutText)
+      .put("stopText", stopText)
+      .put("confidenceText", confidenceText)
+      .put("sourceText", sourceText)
+      .put("reasons", JSONArray(reasons))
+  }
+
+  companion object {
+    fun fromJson(json: JSONObject): RenderedPricePlan {
+      return RenderedPricePlan(
+        status = json.optString("status"),
+        statusText = json.optString("statusText"),
+        actionText = json.optString("actionText"),
+        watchPriceText = json.optString("watchPriceText"),
+        buyZoneText = json.optString("buyZoneText"),
+        breakoutText = json.optString("breakoutText"),
+        stopText = json.optString("stopText"),
+        confidenceText = json.optString("confidenceText"),
+        sourceText = json.optString("sourceText"),
         reasons = json.optJSONArray("reasons").toStringList(),
       )
     }

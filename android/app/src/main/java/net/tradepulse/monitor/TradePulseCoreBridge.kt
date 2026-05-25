@@ -22,10 +22,11 @@ class TradePulseCoreBridge(private val context: Context) {
     tradeDate: String,
     stockCsv: String,
     powerCsv: String,
+    chartRowsBySymbol: Map<String, String> = emptyMap(),
     config: MonitorConfig,
     seenSignals: Set<String>,
   ): RenderedScan {
-    val script = buildScript(tradeDate, stockCsv, powerCsv, config, seenSignals)
+    val script = buildScript(tradeDate, stockCsv, powerCsv, chartRowsBySymbol, config, seenSignals)
     return parseRenderedScan(evaluateWithWebView(script))
   }
 
@@ -111,11 +112,17 @@ class TradePulseCoreBridge(private val context: Context) {
     tradeDate: String,
     stockCsv: String,
     powerCsv: String,
+    chartRowsBySymbol: Map<String, String>,
     config: MonitorConfig,
     seenSignals: Set<String>,
   ): String {
     val seenJson = JSONArray(seenSignals.toList()).toString()
     val configJson = config.toJsConfigJson()
+    val chartJson = JSONObject().apply {
+      chartRowsBySymbol.forEach { (symbol, rawJson) ->
+        put(symbol, runCatching { JSONArray(rawJson) }.getOrElse { JSONArray() })
+      }
+    }.toString()
     return """
       $bundleSource
       (function () {
@@ -125,6 +132,7 @@ class TradePulseCoreBridge(private val context: Context) {
           date: ${JSONObject.quote(tradeDate)},
           stockCsv: ${JSONObject.quote(stockCsv)},
           powerCsv: ${JSONObject.quote(powerCsv)},
+          chartRowsBySymbol: JSON.parse(${JSONObject.quote(chartJson)}),
           config: JSON.parse(${JSONObject.quote(configJson)}),
           seenSignals: seenSignals
         });
@@ -150,6 +158,29 @@ class TradePulseCoreBridge(private val context: Context) {
           };
         }
 
+        function renderPricePlan(plan) {
+          if (!plan) return null;
+          const status = plan.status || 'NO_DATA';
+          const sourceKey = plan.source === 'chart' ? 'pricePlanSourceChart' : 'pricePlanSourceExport';
+          const statusText = globalThis.TradePulseCore.t(language, 'pricePlanStatus' + status);
+          const actionText = plan.actionable
+            ? globalThis.TradePulseCore.t(language, 'pricePlanActionable')
+            : globalThis.TradePulseCore.t(language, 'pricePlanNotActionable');
+          return {
+            status: status,
+            statusText: statusText,
+            actionText: actionText,
+            watchPriceText: fixed(plan.watchPrice),
+            buyZoneText: fixed(plan.buyZoneLow) + ' - ' + fixed(plan.buyZoneHigh),
+            breakoutText: fixed(plan.confirmBreakoutPrice),
+            stopText: fixed(plan.riskStopPrice),
+            confidenceText: (plan.confidenceScore || 0) + '/' + (plan.minConfidence || 60),
+            sourceText: globalThis.TradePulseCore.t(language, sourceKey),
+            reasons: (plan.reasons || []).slice(0, 2)
+              .map((reason) => globalThis.TradePulseCore.translateReason(reason, language))
+          };
+        }
+
         const items = result.results.map((item) => {
           const metrics = metricText(item);
           const reasons = (item.reasons || []).slice(0, 4)
@@ -164,7 +195,8 @@ class TradePulseCoreBridge(private val context: Context) {
             priceText: metrics.price,
             largeDealText: metrics.largeDeal,
             recentLargeDealText: metrics.recentLargeDeal,
-            reasons: reasons
+            reasons: reasons,
+            pricePlan: renderPricePlan(item.pricePlan)
           };
         });
 
@@ -175,8 +207,11 @@ class TradePulseCoreBridge(private val context: Context) {
             item.priceText,
             globalThis.TradePulseCore.t(language, 'largeDeal') + ': ' + item.largeDealText,
             globalThis.TradePulseCore.t(language, 'recentLargeDeal') + ': ' + item.recentLargeDealText,
+            item.pricePlan
+              ? globalThis.TradePulseCore.t(language, 'pricePlan') + ': ' + item.pricePlan.statusText + ' / ' + item.pricePlan.buyZoneText + ' / ' + item.pricePlan.confidenceText
+              : '',
             ...item.reasons.map((value) => '- ' + value)
-          ];
+          ].filter(Boolean);
           return lines.join('\n');
         });
 

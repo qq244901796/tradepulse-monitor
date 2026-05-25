@@ -90,3 +90,27 @@ android\
 ```text
 dist\tradepulse-monitor.zip
 ```
+
+## 1.1 Chart 数据源
+
+当前版本会额外读取 TradePulse Chart 曲线接口：
+
+```text
+https://data1.tradepulse.net/chart.do?sym=股票代码
+```
+
+价格计划会优先使用 Chart 曲线数据；如果 Chart 读取失败，会自动退回原来的 export CSV 数据，不会中断扫描。
+
+重新探索 Chart 页面接口：
+
+```powershell
+$env:TARGET_URL="https://app-trps.tradepulse.net/chart"
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\start_tradepulse_chrome.ps1
+node .\scripts\inspect_chart.mjs
+```
+
+报告输出：
+
+```text
+reports\chart-api-discovery.json
+```

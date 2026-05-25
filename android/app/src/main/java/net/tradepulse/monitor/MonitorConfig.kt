@@ -8,6 +8,10 @@ data class MonitorConfig(
   val lookbackMinutes: Int = 30,
   val entryScore: Int = 45,
   val strongEntryScore: Int = 70,
+  val pricePlanEnabled: Boolean = true,
+  val pricePullbackTolerancePct: Double = 0.8,
+  val priceStopBufferPct: Double = 1.5,
+  val priceMinConfidence: Int = 60,
   val language: String = "zh-CN",
   val notifyEntrySignals: Boolean = true,
 ) {
@@ -19,6 +23,9 @@ data class MonitorConfig(
     if (lookbackMinutes < 1) return "回看分钟必须大于 0。"
     if (entryScore !in 0..100) return "入场阈值必须在 0 到 100 之间。"
     if (strongEntryScore !in 0..100) return "强入场阈值必须在 0 到 100 之间。"
+    if (pricePullbackTolerancePct <= 0.0) return "pricePullbackTolerancePct must be greater than 0."
+    if (priceStopBufferPct <= 0.0) return "priceStopBufferPct must be greater than 0."
+    if (priceMinConfidence !in 0..100) return "priceMinConfidence must be between 0 and 100."
     return null
   }
 
@@ -39,6 +46,12 @@ data class MonitorConfig(
         "rules": {
           "minBuyScoreForEntry": $entryScore,
           "minBuyScoreForStrongEntry": $strongEntryScore
+        },
+        "pricePlan": {
+          "enabled": $pricePlanEnabled,
+          "pullbackTolerancePct": $pricePullbackTolerancePct,
+          "stopBufferPct": $priceStopBufferPct,
+          "minConfidence": $priceMinConfidence
         },
         "server": {
           "host": "127.0.0.1",

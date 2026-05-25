@@ -1,6 +1,6 @@
 $chrome = "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
 $profile = "D:\tradepulse\.chrome-profile"
-$url = "https://app-trps.tradepulse.net/export"
+$url = if ($env:TARGET_URL) { $env:TARGET_URL } else { "https://app-trps.tradepulse.net/export" }
 
 if (-not (Test-Path $chrome)) {
     throw "Chrome not found: $chrome"

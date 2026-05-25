@@ -20,6 +20,10 @@ const modules = [
     'normalizeSymbols',
     'normalizeLanguage',
   ]],
+  ['price-plan.js', [
+    'buildPricePlan',
+    'normalizePriceRows',
+  ]],
   ['analyzer.js', [
     'isTriggeredSignal',
     'classifySymbol',
@@ -52,6 +56,7 @@ ${indent(body, 2)}
       powerRows,
       config: normalizeConfig(input.config || {}),
       seenSignals: new Set(input.seenSignals || []),
+      chartRowsBySymbol: input.chartRowsBySymbol || {},
     });
   }
 

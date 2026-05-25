@@ -162,6 +162,33 @@ export class TradePulseClient {
     };
   }
 
+  async getChartRows(symbol) {
+    const query = new URLSearchParams({ sym: String(symbol || '').toUpperCase() });
+    const url = `${DATA_ORIGIN}/chart.do?${query.toString()}`;
+    const response = await this.request(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        accept: 'application/json,*/*',
+        referer: `${APP_ORIGIN}/chart`,
+      },
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`Chart data failed: HTTP ${response.status} ${text.slice(0, 200)}`);
+    }
+
+    const payload = JSON.parse(text);
+    if (!Array.isArray(payload)) {
+      throw new Error('Chart data did not return an array.');
+    }
+    return {
+      url,
+      rows: payload,
+    };
+  }
+
   async request(url, options = {}) {
     const headers = new Headers(options.headers || {});
     const cookie = this.jar.getCookieHeader(url);

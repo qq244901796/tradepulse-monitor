@@ -17,6 +17,10 @@ class MonitorStore(context: Context) {
       lookbackMinutes = prefs.getInt("lookbackMinutes", 30),
       entryScore = prefs.getInt("entryScore", 45),
       strongEntryScore = prefs.getInt("strongEntryScore", 70),
+      pricePlanEnabled = prefs.getBoolean("pricePlanEnabled", true),
+      pricePullbackTolerancePct = Double.fromBits(prefs.getLong("pricePullbackTolerancePct", 0.8.toRawBits())),
+      priceStopBufferPct = Double.fromBits(prefs.getLong("priceStopBufferPct", 1.5.toRawBits())),
+      priceMinConfidence = prefs.getInt("priceMinConfidence", 60),
       language = prefs.getString("language", "zh-CN") ?: "zh-CN",
       notifyEntrySignals = prefs.getBoolean("notifyEntrySignals", true),
     )
@@ -31,6 +35,10 @@ class MonitorStore(context: Context) {
       putInt("lookbackMinutes", config.lookbackMinutes)
       putInt("entryScore", config.entryScore)
       putInt("strongEntryScore", config.strongEntryScore)
+      putBoolean("pricePlanEnabled", config.pricePlanEnabled)
+      putLong("pricePullbackTolerancePct", config.pricePullbackTolerancePct.toRawBits())
+      putLong("priceStopBufferPct", config.priceStopBufferPct.toRawBits())
+      putInt("priceMinConfidence", config.priceMinConfidence)
       putString("language", config.language)
       putBoolean("notifyEntrySignals", config.notifyEntrySignals)
     }

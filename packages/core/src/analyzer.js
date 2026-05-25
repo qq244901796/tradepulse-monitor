@@ -1,4 +1,5 @@
 import { formatNumber, toNumber } from './csv.js';
+import { buildPricePlan } from './price-plan.js';
 
 const SIGNAL_NONE = new Set(['NEUTRAL', 'NO_DATA']);
 
@@ -22,7 +23,7 @@ export function isTriggeredSignal(signal) {
   return !SIGNAL_NONE.has(signal);
 }
 
-export function classifySymbol(symbol, rows, powerInflows, config, date) {
+export function classifySymbol(symbol, rows, powerInflows, config, date, chartRows = []) {
   const sorted = sortRows(rows);
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
@@ -40,6 +41,15 @@ export function classifySymbol(symbol, rows, powerInflows, config, date) {
       sellScore: 0,
       firstSeen: false,
       reasons: [reason('no_data')],
+      pricePlan: buildPricePlan({
+        symbol,
+        rows: sorted,
+        chartRows,
+        signal: 'NO_DATA',
+        buyScore: 0,
+        sellScore: 0,
+        config,
+      }),
       metrics: {},
     };
   }
@@ -178,6 +188,16 @@ export function classifySymbol(symbol, rows, powerInflows, config, date) {
     signal = 'SELL_PRESSURE';
   }
 
+  const pricePlan = buildPricePlan({
+    symbol,
+    rows: sorted,
+    chartRows,
+    signal,
+    buyScore,
+    sellScore,
+    config,
+  });
+
   return {
     symbol,
     date,
@@ -186,6 +206,7 @@ export function classifySymbol(symbol, rows, powerInflows, config, date) {
     sellScore,
     firstSeen: false,
     reasons,
+    pricePlan,
     metrics: {
       rows: sorted.length,
       firstTime: first.TIME,
@@ -208,7 +229,7 @@ export function classifySymbol(symbol, rows, powerInflows, config, date) {
   };
 }
 
-export function analyzeRows({ date, stockRows, powerRows, config, seenSignals }) {
+export function analyzeRows({ date, stockRows, powerRows, config, seenSignals, chartRowsBySymbol = new Map() }) {
   const rowsBySymbol = new Map(config.monitor.symbols.map((symbol) => [symbol, []]));
 
   for (const row of stockRows) {
@@ -217,7 +238,10 @@ export function analyzeRows({ date, stockRows, powerRows, config, seenSignals })
   }
 
   return config.monitor.symbols.map((symbol) => {
-    const result = classifySymbol(symbol, rowsBySymbol.get(symbol) || [], powerRows, config, date);
+    const chartRows = chartRowsBySymbol instanceof Map
+      ? chartRowsBySymbol.get(symbol) || []
+      : chartRowsBySymbol?.[symbol] || [];
+    const result = classifySymbol(symbol, rowsBySymbol.get(symbol) || [], powerRows, config, date, chartRows);
     if (!isTriggeredSignal(result.signal)) return result;
 
     const key = `${date}|${result.symbol}|${result.signal}`;
@@ -228,8 +252,8 @@ export function analyzeRows({ date, stockRows, powerRows, config, seenSignals })
   });
 }
 
-export function analyzeTradePulse({ date, stockRows, powerRows, config, seenSignals = new Set() }) {
-  const results = analyzeRows({ date, stockRows, powerRows, config, seenSignals });
+export function analyzeTradePulse({ date, stockRows, powerRows, config, seenSignals = new Set(), chartRowsBySymbol = new Map() }) {
+  const results = analyzeRows({ date, stockRows, powerRows, config, seenSignals, chartRowsBySymbol });
   return {
     date,
     results,

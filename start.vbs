@@ -10,7 +10,8 @@ Else
   nodeCmd = "node"
 End If
 
-serverCmd = nodeCmd & " """ & root & "\src\server.js"""
+shell.CurrentDirectory = root
+serverCmd = nodeCmd & " ""src\server.js"""
 shell.Run serverCmd, 0, False
 WScript.Sleep 2000
 shell.Run "http://127.0.0.1:14587", 1, False

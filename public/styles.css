@@ -400,7 +400,7 @@ dt {
 
 table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1180px;
   border-collapse: collapse;
 }
 
@@ -434,6 +434,18 @@ td {
 .reason {
   max-width: 520px;
   color: #344054;
+}
+
+.price-plan {
+  min-width: 220px;
+  color: #344054;
+}
+
+.price-plan-box {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .empty {

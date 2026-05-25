@@ -13,6 +13,12 @@ export const DEFAULT_CONFIG = {
     minBuyScoreForEntry: 45,
     minBuyScoreForStrongEntry: 70,
   },
+  pricePlan: {
+    enabled: true,
+    pullbackTolerancePct: 0.8,
+    stopBufferPct: 1.5,
+    minConfidence: 60,
+  },
   server: {
     host: '127.0.0.1',
     port: 14587,
@@ -35,6 +41,10 @@ export function normalizeConfig(input) {
   config.monitor.runAllDay = config.monitor.runAllDay !== false;
   config.rules.minBuyScoreForEntry = Number(config.rules.minBuyScoreForEntry);
   config.rules.minBuyScoreForStrongEntry = Number(config.rules.minBuyScoreForStrongEntry);
+  config.pricePlan.enabled = config.pricePlan.enabled !== false;
+  config.pricePlan.pullbackTolerancePct = Number(config.pricePlan.pullbackTolerancePct);
+  config.pricePlan.stopBufferPct = Number(config.pricePlan.stopBufferPct);
+  config.pricePlan.minConfidence = Number(config.pricePlan.minConfidence);
   config.server.host = String(config.server.host || DEFAULT_CONFIG.server.host);
   config.server.port = Number(config.server.port || DEFAULT_CONFIG.server.port);
   config.ui.language = normalizeLanguage(config.ui.language);
@@ -59,6 +69,15 @@ export function validateConfig(config) {
   if (!Number.isFinite(config.rules.minBuyScoreForStrongEntry)) {
     errors.push('rules.minBuyScoreForStrongEntry must be a number.');
   }
+  if (!Number.isFinite(config.pricePlan.pullbackTolerancePct) || config.pricePlan.pullbackTolerancePct <= 0) {
+    errors.push('pricePlan.pullbackTolerancePct must be greater than 0.');
+  }
+  if (!Number.isFinite(config.pricePlan.stopBufferPct) || config.pricePlan.stopBufferPct <= 0) {
+    errors.push('pricePlan.stopBufferPct must be greater than 0.');
+  }
+  if (!Number.isFinite(config.pricePlan.minConfidence) || config.pricePlan.minConfidence < 0 || config.pricePlan.minConfidence > 100) {
+    errors.push('pricePlan.minConfidence must be between 0 and 100.');
+  }
   if (!Number.isInteger(config.server.port) || config.server.port < 1 || config.server.port > 65535) {
     errors.push('server.port must be a valid TCP port.');
   }
@@ -78,6 +97,7 @@ export function publicConfig(config, configPath) {
     },
     monitor: config.monitor,
     rules: config.rules,
+    pricePlan: config.pricePlan,
     server: config.server,
     ui: config.ui,
   };

@@ -13,6 +13,12 @@
     "minBuyScoreForEntry": 45,
     "minBuyScoreForStrongEntry": 70
   },
+  "pricePlan": {
+    "enabled": true,
+    "pullbackTolerancePct": 0.8,
+    "stopBufferPct": 1.5,
+    "minConfidence": 60
+  },
   "server": {
     "host": "127.0.0.1",
     "port": 14587

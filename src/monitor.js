@@ -5,7 +5,7 @@ import { loadConfig, publicConfig } from './config.js';
 import { parseCsv } from '../packages/core/src/csv.js';
 import { AuthRequiredError, TradePulseClient } from './tradepulse-client.js';
 
-const VERSION = '0.1.0';
+const VERSION = '1.1.0';
 
 export class MonitorService {
   constructor({ rootDir }) {
@@ -160,6 +160,7 @@ export class MonitorService {
     if (!tradeDate) throw new Error('TradePulse did not return an enabled data date.');
 
     const [stockExport, powerExport] = await this.fetchExportsWithRelogin(tradeDate);
+    const chartRowsBySymbol = await this.fetchChartRowsBySymbol();
     const stockRows = parseCsv(stockExport.text);
     const powerRows = parseCsv(powerExport.text);
     const displayDate = `${tradeDate.slice(0, 4)}-${tradeDate.slice(4, 6)}-${tradeDate.slice(6, 8)}`;
@@ -169,6 +170,7 @@ export class MonitorService {
       powerRows,
       config: this.config,
       seenSignals: this.seenSignals,
+      chartRowsBySymbol,
     });
 
     return {
@@ -182,6 +184,9 @@ export class MonitorService {
         powerExportUrl: powerExport.url,
         stockRows: stockRows.length,
         powerRows: powerRows.length,
+        chartRows: Object.fromEntries(
+          Object.entries(chartRowsBySymbol).map(([symbol, rows]) => [symbol, rows.length]),
+        ),
       },
       results,
       summary: summarizeSignals(results),
@@ -213,6 +218,19 @@ export class MonitorService {
       }),
     ]);
     return [stockExport, powerExport];
+  }
+
+  async fetchChartRowsBySymbol() {
+    const entries = await Promise.all(this.config.monitor.symbols.map(async (symbol) => {
+      try {
+        const chart = await this.client.getChartRows(symbol);
+        return [symbol, chart.rows];
+      } catch (error) {
+        this.log('warn', 'chart_data_failed', { symbol, message: error.message });
+        return [symbol, []];
+      }
+    }));
+    return Object.fromEntries(entries);
   }
 
   async ensureLoggedIn() {
@@ -355,6 +373,7 @@ function summarizeScan(result) {
       buyScore: item.buyScore,
       sellScore: item.sellScore,
       firstSeen: item.firstSeen,
+      pricePlan: item.pricePlan,
     })),
   };
 }

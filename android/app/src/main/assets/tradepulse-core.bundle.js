@@ -82,6 +82,12 @@
       minBuyScoreForEntry: 45,
       minBuyScoreForStrongEntry: 70,
     },
+    pricePlan: {
+      enabled: true,
+      pullbackTolerancePct: 0.8,
+      stopBufferPct: 1.5,
+      minConfidence: 60,
+    },
     server: {
       host: '127.0.0.1',
       port: 14587,
@@ -104,6 +110,10 @@
     config.monitor.runAllDay = config.monitor.runAllDay !== false;
     config.rules.minBuyScoreForEntry = Number(config.rules.minBuyScoreForEntry);
     config.rules.minBuyScoreForStrongEntry = Number(config.rules.minBuyScoreForStrongEntry);
+    config.pricePlan.enabled = config.pricePlan.enabled !== false;
+    config.pricePlan.pullbackTolerancePct = Number(config.pricePlan.pullbackTolerancePct);
+    config.pricePlan.stopBufferPct = Number(config.pricePlan.stopBufferPct);
+    config.pricePlan.minConfidence = Number(config.pricePlan.minConfidence);
     config.server.host = String(config.server.host || DEFAULT_CONFIG.server.host);
     config.server.port = Number(config.server.port || DEFAULT_CONFIG.server.port);
     config.ui.language = normalizeLanguage(config.ui.language);
@@ -128,6 +138,15 @@
     if (!Number.isFinite(config.rules.minBuyScoreForStrongEntry)) {
       errors.push('rules.minBuyScoreForStrongEntry must be a number.');
     }
+    if (!Number.isFinite(config.pricePlan.pullbackTolerancePct) || config.pricePlan.pullbackTolerancePct <= 0) {
+      errors.push('pricePlan.pullbackTolerancePct must be greater than 0.');
+    }
+    if (!Number.isFinite(config.pricePlan.stopBufferPct) || config.pricePlan.stopBufferPct <= 0) {
+      errors.push('pricePlan.stopBufferPct must be greater than 0.');
+    }
+    if (!Number.isFinite(config.pricePlan.minConfidence) || config.pricePlan.minConfidence < 0 || config.pricePlan.minConfidence > 100) {
+      errors.push('pricePlan.minConfidence must be between 0 and 100.');
+    }
     if (!Number.isInteger(config.server.port) || config.server.port < 1 || config.server.port > 65535) {
       errors.push('server.port must be a valid TCP port.');
     }
@@ -147,6 +166,7 @@
       },
       monitor: config.monitor,
       rules: config.rules,
+      pricePlan: config.pricePlan,
       server: config.server,
       ui: config.ui,
     };
@@ -189,6 +209,232 @@
 
 
 
+  const ENTRY_SIGNALS = new Set(['STRONG_ENTRY', 'MIXED_ENTRY', 'POSSIBLE_ENTRY']);
+
+  function reason(code, params = {}) {
+    return { code, params };
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function roundPrice(value) {
+    if (!Number.isFinite(value) || value <= 0) return null;
+    if (value >= 100) return Number(value.toFixed(2));
+    if (value >= 10) return Number(value.toFixed(3));
+    return Number(value.toFixed(4));
+  }
+
+  function avg(values) {
+    const valid = values.filter((value) => Number.isFinite(value) && value > 0);
+    if (!valid.length) return 0;
+    return valid.reduce((total, value) => total + value, 0) / valid.length;
+  }
+
+  function weightedAverage(items) {
+    let weighted = 0;
+    let weightTotal = 0;
+    for (const item of items) {
+      if (!Number.isFinite(item.price) || item.price <= 0 || !Number.isFinite(item.weight) || item.weight <= 0) continue;
+      weighted += item.price * item.weight;
+      weightTotal += item.weight;
+    }
+    return weightTotal > 0 ? weighted / weightTotal : 0;
+  }
+
+  function normalizeSettings(config = {}) {
+    const settings = config.pricePlan || {};
+    return {
+      enabled: settings.enabled !== false,
+      pullbackTolerancePct: Number.isFinite(Number(settings.pullbackTolerancePct))
+        ? clamp(Number(settings.pullbackTolerancePct), 0.1, 5)
+        : 0.8,
+      stopBufferPct: Number.isFinite(Number(settings.stopBufferPct))
+        ? clamp(Number(settings.stopBufferPct), 0.1, 10)
+        : 1.5,
+      minConfidence: Number.isFinite(Number(settings.minConfidence))
+        ? clamp(Number(settings.minConfidence), 0, 100)
+        : 60,
+    };
+  }
+
+  function buildPricePlan({
+    symbol,
+    rows,
+    chartRows = [],
+    signal,
+    buyScore,
+    sellScore,
+    config,
+  }) {
+    const settings = normalizeSettings(config);
+    if (!settings.enabled) {
+      return {
+        enabled: false,
+        status: 'DISABLED',
+        source: 'none',
+        confidenceScore: 0,
+        actionable: false,
+        reasons: [reason('price_plan_disabled')],
+      };
+    }
+
+    const normalizedChartRows = normalizePriceRows(chartRows);
+    const sourceRows = normalizedChartRows.length ? normalizedChartRows : normalizePriceRows(rows);
+
+    if (!sourceRows.length) {
+      return {
+        enabled: true,
+        status: 'NO_DATA',
+        source: 'none',
+        confidenceScore: 0,
+        actionable: false,
+        reasons: [reason('price_plan_no_data')],
+      };
+    }
+
+    const source = normalizedChartRows.length ? 'chart' : 'export';
+    const first = sourceRows[0];
+    const last = sourceRows[sourceRows.length - 1];
+    const recent = sourceRows.slice(-Math.min(sourceRows.length, Math.max(5, config.monitor?.lookbackMinutes || 30)));
+    const prices = sourceRows.map((row) => row.price).filter((value) => value > 0);
+    const recentPrices = recent.map((row) => row.price).filter((value) => value > 0);
+    const institutionalRows = sourceRows.filter((row) => row.largeDeal > 0 || row.powerInflow > 0);
+    const institutionalRecent = recent.filter((row) => row.largeDeal > 0 || row.powerInflow > 0);
+    const institutionalVwap = weightedAverage(
+      institutionalRows.map((row) => ({
+        price: row.price,
+        weight: Math.max(row.largeDeal, 0) + Math.max(row.powerInflow, 0),
+      })),
+    );
+    const allVwap = weightedAverage(
+      sourceRows.map((row) => ({
+        price: row.price,
+        weight: Math.abs(row.largeDeal) || 1,
+      })),
+    );
+    const anchorPrice = institutionalVwap || allVwap || avg(recentPrices) || last.price;
+    const recentLow = Math.min(...recentPrices);
+    const recentHigh = Math.max(...recentPrices);
+    const dayLow = Math.min(...prices);
+    const dayHigh = Math.max(...prices);
+    const institutionalLow = institutionalRows.length
+      ? Math.min(...institutionalRows.map((row) => row.price).filter((value) => value > 0))
+      : 0;
+    const support = Math.max(
+      0,
+      Math.min(
+        ...[recentLow, institutionalLow || recentLow, anchorPrice].filter((value) => Number.isFinite(value) && value > 0),
+      ),
+    );
+    const tolerance = settings.pullbackTolerancePct / 100;
+    const stopBuffer = settings.stopBufferPct / 100;
+    const buyZoneLow = support ? support * (1 - tolerance) : anchorPrice * (1 - tolerance);
+    const buyZoneHigh = anchorPrice * (1 + tolerance);
+    const confirmBreakoutPrice = Math.max(recentHigh, last.price, anchorPrice) * (1 + tolerance / 2);
+    const riskStopPrice = (support || anchorPrice) * (1 - stopBuffer);
+    const largeTotal = sourceRows.reduce((total, row) => total + row.largeDeal, 0);
+    const largeAbs = sourceRows.reduce((total, row) => total + Math.abs(row.largeDeal), 0);
+    const recentLargeTotal = recent.reduce((total, row) => total + row.largeDeal, 0);
+    const recentLargeAbs = recent.reduce((total, row) => total + Math.abs(row.largeDeal), 0);
+    const largeRatio = largeAbs > 0 ? largeTotal / largeAbs : 0;
+    const recentLargeRatio = recentLargeAbs > 0 ? recentLargeTotal / recentLargeAbs : 0;
+    const priceChangePct = first.price ? ((last.price - first.price) / first.price) * 100 : 0;
+
+    const planReasons = [];
+    let confidence = Math.max(0, buyScore - Math.max(0, sellScore * 0.45));
+
+    if (ENTRY_SIGNALS.has(signal)) {
+      confidence += 10;
+      planReasons.push(reason('price_plan_entry_signal', { signal }));
+    }
+    if (institutionalRows.length) {
+      confidence += Math.min(15, 5 + institutionalRows.length);
+      planReasons.push(reason('price_plan_institutional_anchor', {
+        count: institutionalRows.length,
+        price: formatNumber(anchorPrice, 2),
+      }));
+    }
+    if (institutionalRecent.length) {
+      confidence += 8;
+      planReasons.push(reason('price_plan_recent_buying', { count: institutionalRecent.length }));
+    }
+    if (largeRatio > 0.12) {
+      confidence += 8;
+      planReasons.push(reason('price_plan_large_deal_positive', { ratio: formatNumber(largeRatio * 100, 1) }));
+    }
+    if (recentLargeRatio > 0.12) {
+      confidence += 8;
+      planReasons.push(reason('price_plan_recent_large_positive', { ratio: formatNumber(recentLargeRatio * 100, 1) }));
+    }
+    if (priceChangePct > 0.3) {
+      confidence += 4;
+      planReasons.push(reason('price_plan_price_confirming', { pct: formatNumber(priceChangePct, 2) }));
+    }
+    if (sellScore >= buyScore || signal === 'SELL_PRESSURE') {
+      confidence -= 30;
+      planReasons.push(reason('price_plan_sell_pressure'));
+    }
+    if (last.price > 0 && last.price > confirmBreakoutPrice * 1.03) {
+      confidence -= 8;
+      planReasons.push(reason('price_plan_extended'));
+    }
+
+    confidence = Math.round(clamp(confidence, 0, 100));
+    const status = confidence >= settings.minConfidence && ENTRY_SIGNALS.has(signal)
+      ? 'READY'
+      : confidence >= settings.minConfidence
+        ? 'WATCH'
+        : 'LOW_CONFIDENCE';
+
+    if (!planReasons.length) {
+      planReasons.push(reason('price_plan_wait_confirmation'));
+    }
+
+    return {
+      enabled: true,
+      status,
+      source,
+      actionable: status === 'READY',
+      watchPrice: roundPrice(anchorPrice),
+      buyZoneLow: roundPrice(Math.min(buyZoneLow, buyZoneHigh)),
+      buyZoneHigh: roundPrice(Math.max(buyZoneLow, buyZoneHigh)),
+      confirmBreakoutPrice: roundPrice(confirmBreakoutPrice),
+      riskStopPrice: roundPrice(riskStopPrice),
+      confidenceScore: confidence,
+      minConfidence: settings.minConfidence,
+      reasons: planReasons,
+      metrics: {
+        lastPrice: roundPrice(last.price),
+        dayLow: roundPrice(dayLow),
+        dayHigh: roundPrice(dayHigh),
+        recentLow: roundPrice(recentLow),
+        recentHigh: roundPrice(recentHigh),
+        institutionalVwap: roundPrice(institutionalVwap),
+        exportVwap: roundPrice(allVwap),
+        largeDealRatio: largeRatio,
+        recentLargeDealRatio: recentLargeRatio,
+        priceChangePct,
+      },
+    };
+  }
+
+  function normalizePriceRows(rows = []) {
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .map((row) => ({
+        time: String(row.TIME || row.time || row.datetime || row.dateTime || row.t || ''),
+        price: toNumber(row.PRICE ?? row.price ?? row.close ?? row.value ?? row.p),
+        largeDeal: toNumber(row['LARGE DEAL'] ?? row.largeDeal ?? row.large_deal ?? row.l ?? 0),
+        powerInflow: toNumber(row['PWR INFLOW'] ?? row.powerInflow ?? row.pwrInflow ?? row.i ?? 0),
+      }))
+      .filter((row) => row.price > 0)
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }
+
+
+
   const SIGNAL_NONE = new Set(['NEUTRAL', 'NO_DATA']);
 
   function sortRows(rows) {
@@ -211,7 +457,7 @@
     return !SIGNAL_NONE.has(signal);
   }
 
-  function classifySymbol(symbol, rows, powerInflows, config, date) {
+  function classifySymbol(symbol, rows, powerInflows, config, date, chartRows = []) {
     const sorted = sortRows(rows);
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
@@ -229,6 +475,15 @@
         sellScore: 0,
         firstSeen: false,
         reasons: [reason('no_data')],
+        pricePlan: buildPricePlan({
+          symbol,
+          rows: sorted,
+          chartRows,
+          signal: 'NO_DATA',
+          buyScore: 0,
+          sellScore: 0,
+          config,
+        }),
         metrics: {},
       };
     }
@@ -367,6 +622,16 @@
       signal = 'SELL_PRESSURE';
     }
 
+    const pricePlan = buildPricePlan({
+      symbol,
+      rows: sorted,
+      chartRows,
+      signal,
+      buyScore,
+      sellScore,
+      config,
+    });
+
     return {
       symbol,
       date,
@@ -375,6 +640,7 @@
       sellScore,
       firstSeen: false,
       reasons,
+      pricePlan,
       metrics: {
         rows: sorted.length,
         firstTime: first.TIME,
@@ -397,7 +663,7 @@
     };
   }
 
-  function analyzeRows({ date, stockRows, powerRows, config, seenSignals }) {
+  function analyzeRows({ date, stockRows, powerRows, config, seenSignals, chartRowsBySymbol = new Map() }) {
     const rowsBySymbol = new Map(config.monitor.symbols.map((symbol) => [symbol, []]));
 
     for (const row of stockRows) {
@@ -406,7 +672,10 @@
     }
 
     return config.monitor.symbols.map((symbol) => {
-      const result = classifySymbol(symbol, rowsBySymbol.get(symbol) || [], powerRows, config, date);
+      const chartRows = chartRowsBySymbol instanceof Map
+        ? chartRowsBySymbol.get(symbol) || []
+        : chartRowsBySymbol?.[symbol] || [];
+      const result = classifySymbol(symbol, rowsBySymbol.get(symbol) || [], powerRows, config, date, chartRows);
       if (!isTriggeredSignal(result.signal)) return result;
 
       const key = `${date}|${result.symbol}|${result.signal}`;
@@ -417,8 +686,8 @@
     });
   }
 
-  function analyzeTradePulse({ date, stockRows, powerRows, config, seenSignals = new Set() }) {
-    const results = analyzeRows({ date, stockRows, powerRows, config, seenSignals });
+  function analyzeTradePulse({ date, stockRows, powerRows, config, seenSignals = new Set(), chartRowsBySymbol = new Map() }) {
+    const results = analyzeRows({ date, stockRows, powerRows, config, seenSignals, chartRowsBySymbol });
     return {
       date,
       results,
@@ -453,6 +722,34 @@
 
   const I18N = {
     'zh-CN': {
+      pricePlan: '\u4ef7\u683c\u8ba1\u5212',
+      pricePlanWatch: '\u89c2\u5bdf\u4ef7',
+      pricePlanBuyZone: '\u4e70\u5165\u533a\u95f4',
+      pricePlanBreakout: '\u7a81\u7834\u786e\u8ba4',
+      pricePlanStop: '\u98ce\u9669\u6b62\u635f',
+      pricePlanConfidence: '\u53ef\u4fe1\u5ea6',
+      pricePlanSource: '\u6570\u636e\u6e90',
+      pricePlanActionable: '\u8fbe\u5230\u8ba1\u5212\u6761\u4ef6',
+      pricePlanNotActionable: '\u7ee7\u7eed\u89c2\u5bdf',
+      pricePlanSourceChart: 'Chart',
+      pricePlanSourceExport: 'Export',
+      pricePlanStatusREADY: '\u53ef\u6267\u884c',
+      pricePlanStatusWATCH: '\u89c2\u5bdf\u4e2d',
+      pricePlanStatusLOW_CONFIDENCE: '\u4fe1\u5fc3\u4e0d\u8db3',
+      pricePlanStatusNO_DATA: '\u65e0\u4ef7\u683c\u6570\u636e',
+      pricePlanStatusDISABLED: '\u5df2\u5173\u95ed',
+      'reason.price_plan_disabled': '\u4ef7\u683c\u8ba1\u5212\u5df2\u5173\u95ed\u3002',
+      'reason.price_plan_no_data': '\u6ca1\u6709\u53ef\u7528\u4ef7\u683c\u6570\u636e\u3002',
+      'reason.price_plan_entry_signal': '\u5df2\u51fa\u73b0\u5165\u573a\u7c7b\u4fe1\u53f7\u3002',
+      'reason.price_plan_institutional_anchor': '\u673a\u6784\u4e70\u5165\u5747\u4ef7\u9644\u8fd1\u5f62\u6210\u53c2\u8003\u4ef7\uff08{price}\uff09\u3002',
+      'reason.price_plan_recent_buying': '\u6700\u8fd1\u4ecd\u6709\u673a\u6784\u4e70\u5165\u5206\u949f\uff08{count}\uff09\u3002',
+      'reason.price_plan_large_deal_positive': '\u5168\u65e5\u5927\u5355\u51c0\u6d41\u5411\u504f\u6b63\uff08{ratio}%\uff09\u3002',
+      'reason.price_plan_recent_large_positive': '\u6700\u8fd1\u5927\u5355\u51c0\u6d41\u5411\u504f\u6b63\uff08{ratio}%\uff09\u3002',
+      'reason.price_plan_price_confirming': '\u4ef7\u683c\u5df2\u540c\u6b65\u8d70\u5f3a\uff08{pct}%\uff09\u3002',
+      'reason.price_plan_sell_pressure': '\u5356\u538b\u9ad8\u4e8e\u4e70\u5165\u4fe1\u53f7\uff0c\u964d\u4f4e\u4ef7\u683c\u8ba1\u5212\u53ef\u4fe1\u5ea6\u3002',
+      'reason.price_plan_extended': '\u73b0\u4ef7\u5df2\u660e\u663e\u9ad8\u4e8e\u7a81\u7834\u4ef7\uff0c\u8ffd\u4ef7\u98ce\u9669\u589e\u52a0\u3002',
+      'reason.price_plan_wait_confirmation': '\u8fd8\u9700\u8981\u7b49\u5f85\u66f4\u660e\u786e\u7684\u673a\u6784\u4e70\u5165\u6216\u4ef7\u683c\u786e\u8ba4\u3002',
+      'log.chart_data_failed': '\u66f2\u7ebf\u6570\u636e\u8bfb\u53d6\u5931\u8d25\uff08{symbol}\uff09\uff1a{message}\u3002',
       subtitle: '本地机构入场监控',
       language: '语言',
       settings: '设置',
@@ -554,6 +851,34 @@
       'log.message': '{message}',
     },
     'en-US': {
+      pricePlan: 'Price Plan',
+      pricePlanWatch: 'Watch Price',
+      pricePlanBuyZone: 'Buy Zone',
+      pricePlanBreakout: 'Breakout Confirm',
+      pricePlanStop: 'Risk Stop',
+      pricePlanConfidence: 'Confidence',
+      pricePlanSource: 'Source',
+      pricePlanActionable: 'Plan conditions met',
+      pricePlanNotActionable: 'Keep watching',
+      pricePlanSourceChart: 'Chart',
+      pricePlanSourceExport: 'Export',
+      pricePlanStatusREADY: 'Ready',
+      pricePlanStatusWATCH: 'Watching',
+      pricePlanStatusLOW_CONFIDENCE: 'Low Confidence',
+      pricePlanStatusNO_DATA: 'No Price Data',
+      pricePlanStatusDISABLED: 'Disabled',
+      'reason.price_plan_disabled': 'Price plan is disabled.',
+      'reason.price_plan_no_data': 'No usable price data is available.',
+      'reason.price_plan_entry_signal': 'An entry-type signal is already present.',
+      'reason.price_plan_institutional_anchor': 'Institutional buying forms a reference price near {price}.',
+      'reason.price_plan_recent_buying': 'Recent institutional buying minutes are still present ({count}).',
+      'reason.price_plan_large_deal_positive': 'Full-session large-deal net flow is positive ({ratio}%).',
+      'reason.price_plan_recent_large_positive': 'Recent large-deal net flow is positive ({ratio}%).',
+      'reason.price_plan_price_confirming': 'Price is confirming upward movement ({pct}%).',
+      'reason.price_plan_sell_pressure': 'Sell pressure is stronger than the buying signal, reducing confidence.',
+      'reason.price_plan_extended': 'Current price is already extended above breakout confirmation, so chase risk is higher.',
+      'reason.price_plan_wait_confirmation': 'Wait for clearer institutional buying or price confirmation.',
+      'log.chart_data_failed': 'Chart data failed ({symbol}): {message}.',
       subtitle: 'Local institutional-flow monitor',
       language: 'Language',
       settings: 'Settings',
@@ -736,6 +1061,7 @@
       powerRows,
       config: normalizeConfig(input.config || {}),
       seenSignals: new Set(input.seenSignals || []),
+      chartRowsBySymbol: input.chartRowsBySymbol || {},
     });
   }
 
@@ -751,6 +1077,8 @@
     publicConfig,
     normalizeSymbols,
     normalizeLanguage,
+    buildPricePlan,
+    normalizePriceRows,
     isTriggeredSignal,
     classifySymbol,
     analyzeRows,
