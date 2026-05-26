@@ -11,8 +11,15 @@ import {
   summarizeTopFlowChanges,
   topFlowsTypeLabel,
 } from './topflows.js';
+import {
+  buildPowerInflowEmail,
+  comparePowerInflowSnapshots,
+  normalizePowerInflowRows,
+  summarizePowerInflowChanges,
+} from './power-inflows.js';
+import { normalizeResendConfig, sendResendMail } from './email-resend.js';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 export class MonitorService {
   constructor({ rootDir }) {
@@ -24,6 +31,7 @@ export class MonitorService {
     this.startedAt = new Date().toISOString();
     this.seenSignals = new Set();
     this.topFlowsSnapshot = null;
+    this.powerInflowsSnapshot = null;
     this.history = [];
     this.logs = [];
     this.state = {
@@ -133,7 +141,7 @@ export class MonitorService {
       this.appendHistory(result);
       this.state.schedule.lastRunFinishedAt = new Date().toISOString();
       this.log('info', 'scan_finished', {
-        symbols: result.results.length || result.topFlows?.rows?.length || 0,
+        symbols: result.results.length || result.topFlows?.rows?.length || result.powerInflows?.rows?.length || 0,
         durationMs: result.durationMs,
       });
       return {
@@ -160,6 +168,9 @@ export class MonitorService {
   }
 
   async runScan(trigger) {
+    if (this.config.monitor.mode === 'power-inflows') {
+      return this.runPowerInflowsScan(trigger);
+    }
     if (this.config.monitor.mode === 'topflows') {
       return this.runTopFlowsScan(trigger);
     }
@@ -248,6 +259,95 @@ export class MonitorService {
     };
   }
 
+  async runPowerInflowsScan(trigger) {
+    const started = Date.now();
+    await this.ensureLoggedIn();
+
+    const dates = await this.client.getLatestDates();
+    const tradeDateRaw = dates[0];
+    if (!tradeDateRaw) throw new Error('TradePulse did not return an enabled data date.');
+
+    const powerExport = await this.fetchPowerInflowsWithRelogin(tradeDateRaw);
+    const rawRows = parseCsv(powerExport.text);
+    const rows = normalizePowerInflowRows(rawRows);
+    const changes = comparePowerInflowSnapshots(this.powerInflowsSnapshot?.rows || [], rows);
+    const generatedAt = new Date().toISOString();
+    const tradeDate = `${tradeDateRaw.slice(0, 4)}-${tradeDateRaw.slice(4, 6)}-${tradeDateRaw.slice(6, 8)}`;
+    this.powerInflowsSnapshot = {
+      generatedAt,
+      tradeDate,
+      rows,
+    };
+    const notification = await this.notifyPowerInflows({
+      generatedAt,
+      tradeDate,
+      entered: changes.entered,
+      baseline: changes.baseline,
+    });
+
+    return {
+      id: `${Date.now()}`,
+      mode: 'power-inflows',
+      trigger,
+      generatedAt,
+      tradeDate,
+      durationMs: Date.now() - started,
+      source: {
+        powerInflowsUrl: powerExport.url,
+        powerInflowsRows: rows.length,
+        rawRows: rawRows.length,
+      },
+      powerInflows: {
+        rows,
+        changes,
+        notification,
+      },
+      results: [],
+      summary: summarizePowerInflowChanges(changes, rows),
+    };
+  }
+
+  async notifyPowerInflows({ generatedAt, tradeDate, entered, baseline }) {
+    const emailConfig = this.config.notifications?.email || {};
+    const resendConfig = normalizeResendConfig(emailConfig);
+    const notification = {
+      enabled: Boolean(resendConfig.recipients.length),
+      sent: false,
+      skippedReason: '',
+      error: '',
+      sentAt: '',
+    };
+
+    if (!notification.enabled) {
+      notification.skippedReason = 'disabled';
+      return notification;
+    }
+    if (!resendConfig.resendApiKey) {
+      notification.skippedReason = 'api_key_missing';
+      return notification;
+    }
+    if (baseline) {
+      notification.skippedReason = 'baseline';
+      return notification;
+    }
+    if (!entered.length) {
+      notification.skippedReason = 'no_entered';
+      return notification;
+    }
+
+    try {
+      await sendResendMail(emailConfig, buildPowerInflowEmail({ generatedAt, tradeDate, entered }));
+      notification.sent = true;
+      notification.sentAt = new Date().toISOString();
+      this.log('info', 'email_sent', { count: entered.length });
+    } catch (error) {
+      notification.error = error.message;
+      this.log('error', 'email_failed', { message: error.message });
+    }
+
+    return notification;
+  }
+
   async fetchExportsWithRelogin(tradeDate) {
     try {
       return await this.fetchExports(tradeDate);
@@ -273,6 +373,17 @@ export class MonitorService {
       }),
     ]);
     return [stockExport, powerExport];
+  }
+
+  async fetchPowerInflowsWithRelogin(tradeDate) {
+    try {
+      return await this.client.getPowerInflows({ date: tradeDate });
+    } catch (error) {
+      if (!(error instanceof AuthRequiredError)) throw error;
+      this.log('warn', 'export_session_expired');
+      await this.login();
+      return this.client.getPowerInflows({ date: tradeDate });
+    }
   }
 
   async fetchChartRowsBySymbol() {
@@ -378,6 +489,15 @@ export class MonitorService {
               };
             }
           }
+          if (record.mode === 'power-inflows' && record.powerInflows?.rows?.length) {
+            if (!this.powerInflowsSnapshot || String(record.generatedAt).localeCompare(this.powerInflowsSnapshot.generatedAt) > 0) {
+              this.powerInflowsSnapshot = {
+                generatedAt: record.generatedAt,
+                tradeDate: record.tradeDate,
+                rows: record.powerInflows.rows,
+              };
+            }
+          }
           for (const result of record.results || []) {
             if (isTriggeredSignal(result.signal)) {
               this.seenSignals.add(`${result.date}|${result.symbol}|${result.signal}`);
@@ -424,6 +544,23 @@ function summarizeSignals(results) {
 }
 
 function summarizeScan(result) {
+  if (result.mode === 'power-inflows') {
+    return {
+      id: result.id,
+      mode: result.mode,
+      generatedAt: result.generatedAt,
+      tradeDate: result.tradeDate,
+      durationMs: result.durationMs,
+      trigger: result.trigger,
+      summary: result.summary,
+      powerInflows: {
+        rowCount: result.powerInflows?.rows?.length || 0,
+        changes: result.powerInflows?.changes || summarizePowerInflowChanges(),
+        notification: result.powerInflows?.notification || {},
+      },
+    };
+  }
+
   if (result.mode === 'topflows') {
     return {
       id: result.id,

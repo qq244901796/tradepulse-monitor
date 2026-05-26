@@ -52,6 +52,7 @@
           <select id="configMode" name="mode">
             <option value="stock-list" data-i18n="stockListMode">股票列表</option>
             <option value="topflows" data-i18n="topFlowsMode">Top Flows</option>
+            <option value="power-inflows" data-i18n="powerInflowsMode">Power Inflows</option>
           </select>
         </label>
 
@@ -83,6 +84,26 @@
             <span data-i18n="strongScore">强入场阈值</span>
             <input id="configStrongScore" name="minBuyScoreForStrongEntry" type="number" min="0" max="100" value="70" required>
           </label>
+        </div>
+
+        <div id="emailSettings" class="email-settings power-inflows-only hidden">
+          <div class="section-title">
+            <strong data-i18n="emailNotification">邮件提醒</strong>
+            <span class="muted" data-i18n="emailNotificationHelp">填写 Resend API Key 和接收提醒的邮箱。</span>
+          </div>
+          <label>
+            <span data-i18n="mailApiKey">Resend API Key</span>
+            <input id="mailApiKey" name="mailApiKey" type="password" autocomplete="off" data-i18n-placeholder="mailApiKeyPlaceholder" placeholder="已有配置时可留空">
+            <small id="mailApiKeyHelp" data-i18n="mailApiKeyHelp">已有配置时不填表示保留当前 API Key。</small>
+          </label>
+          <label>
+            <span data-i18n="mailRecipient">收件邮箱</span>
+            <input id="mailRecipient" name="mailRecipient" type="text" data-i18n-placeholder="mailRecipientPlaceholder" placeholder="多个收件人用逗号分隔">
+          </label>
+          <div class="email-actions">
+            <button id="testEmail" type="button" data-i18n="testEmail">发送测试邮件</button>
+            <span class="muted" data-i18n="testEmailHelp">用当前填写的 API Key 和收件邮箱发送一封测试邮件。</span>
+          </div>
         </div>
         <button id="saveSettings" type="submit" class="primary" data-i18n="saveSettings">保存设置并扫描</button>
       </form>

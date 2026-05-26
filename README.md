@@ -33,10 +33,11 @@ http://127.0.0.1:14587
 
 首次运行直接在页面里填写账号、密码、股票列表和阈值，不需要手改配置文件。
 
-1.2 起 Windows 端可以在设置里选择两种监控模式：
+1.3 起 Windows 端可以在设置里选择三种监控模式：
 
 - `股票列表`：按指定股票识别机构入场、卖压和价格计划。
 - `Top Flows`：定期读取 TradePulse Top Flows 榜单，观察新进榜、离开榜单和名次变动。
+- `Power Inflows`：定期读取官方强资金流入榜单，只在新股票进入榜单时触发邮件提醒。
 
 ## 共享核心
 
@@ -129,3 +130,13 @@ https://data1.tradepulse.net/rank.do?type=0
 ```
 
 当前 Windows 端先固定使用 `ALL` 榜单。后续如果要加 `NYSE`、`NASDAQ`、`ETF` 过滤，只需要继续扩展 `topFlows.type` 和页面选择控件。
+
+## 1.3 Power Inflows 邮件提醒
+
+Power Inflows 模式读取：
+
+```text
+https://app-trps.tradepulse.net/api/export?symbol=*&sdate=YYYYMMDD&edate=YYYYMMDD&type=1
+```
+
+设置页里只需要填写 Resend API Key 和收件邮箱，并可点击“发送测试邮件”先验证。软件固定使用 Resend 测试发件人 `onboarding@resend.dev`，不需要配置 SMTP、授权码、域名或发件邮箱。没有自有域名时，该测试发件人通常只能发到 Resend 账号绑定邮箱。软件只在 Power Inflows 出现新进榜股票时发送邮件；首次扫描只建立基线，不发送整张榜单。

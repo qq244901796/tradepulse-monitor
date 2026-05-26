@@ -57,6 +57,7 @@ export function loadConfig(rootDir) {
       error.includes('account.email')
       || error.includes('account.password')
       || error.includes('monitor.symbols')
+      || error.includes('notifications.email')
     )),
     errors,
   };

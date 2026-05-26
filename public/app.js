@@ -14,6 +14,8 @@ const state = {
   monitorMode: 'stock-list',
   symbols: [],
   topFlows: { type: 0 },
+  powerInflows: { source: 'export-type-1' },
+  notifications: { email: { recipient: '', resendApiKeyConfigured: false } },
   pricePlan: null,
   settingsDirty: false,
   lastStatus: null,
@@ -30,6 +32,7 @@ document.getElementById('configMode').addEventListener('change', handleModeChang
 document.getElementById('addSymbol').addEventListener('click', addSymbolsFromInput);
 document.getElementById('symbolInput').addEventListener('keydown', handleSymbolKeydown);
 document.getElementById('symbolInput').addEventListener('paste', () => setTimeout(addSymbolsFromInput, 0));
+document.getElementById('testEmail').addEventListener('click', testEmail);
 document.getElementById('settingsForm').addEventListener('input', () => {
   state.settingsDirty = true;
 });
@@ -119,6 +122,13 @@ function readSettingsForm() {
     },
     pricePlan: state.pricePlan || undefined,
     topFlows: state.topFlows || { type: 0 },
+    powerInflows: state.powerInflows || { source: 'export-type-1' },
+    notifications: {
+      email: {
+        resendApiKey: document.getElementById('mailApiKey').value.trim(),
+        recipient: document.getElementById('mailRecipient').value.trim(),
+      },
+    },
     server: {
       host: '127.0.0.1',
       port: 14587,
@@ -134,9 +144,12 @@ function populateSettings(status, force = false) {
   const config = status.publicConfig || {};
   const monitor = config.monitor || {};
   const rules = config.rules || {};
+  const email = config.notifications?.email || {};
   state.pricePlan = config.pricePlan || null;
   state.topFlows = config.topFlows || { type: 0 };
-  state.monitorMode = monitor.mode === 'topflows' ? 'topflows' : 'stock-list';
+  state.powerInflows = config.powerInflows || { source: 'export-type-1' };
+  state.notifications = config.notifications || { email: { recipient: '', resendApiKeyConfigured: false } };
+  state.monitorMode = normalizeMonitorMode(monitor.mode);
   document.getElementById('configMode').value = state.monitorMode;
   document.getElementById('configEmail').value = config.account?.email || '';
   document.getElementById('configPassword').value = '';
@@ -144,26 +157,43 @@ function populateSettings(status, force = false) {
   document.getElementById('configLookback').value = monitor.lookbackMinutes || 30;
   document.getElementById('configEntryScore').value = rules.minBuyScoreForEntry || 45;
   document.getElementById('configStrongScore').value = rules.minBuyScoreForStrongEntry || 70;
+  document.getElementById('mailApiKey').value = '';
+  document.getElementById('mailRecipient').value = email.recipient || '';
+  document.getElementById('mailApiKeyHelp').textContent = email.resendApiKeyConfigured
+    ? t('mailApiKeyConfiguredHelp')
+    : t('mailApiKeyHelp');
   state.symbols = [...(monitor.symbols || ['AAPL'])];
   renderModeFields();
   renderSymbolTags();
 }
 
 function handleModeChange(event) {
-  state.monitorMode = event.target.value === 'topflows' ? 'topflows' : 'stock-list';
+  state.monitorMode = normalizeMonitorMode(event.target.value);
   state.settingsDirty = true;
   renderModeFields();
 }
 
 function renderModeFields() {
-  const topFlowsMode = state.monitorMode === 'topflows';
+  const stockMode = state.monitorMode === 'stock-list';
+  const powerInflowsMode = state.monitorMode === 'power-inflows';
   document.querySelectorAll('.stock-only').forEach((element) => {
-    element.classList.toggle('hidden', topFlowsMode);
+    element.classList.toggle('hidden', !stockMode);
+  });
+  document.querySelectorAll('.power-inflows-only').forEach((element) => {
+    element.classList.toggle('hidden', !powerInflowsMode);
   });
   ['configLookback', 'configEntryScore', 'configStrongScore'].forEach((id) => {
     const input = document.getElementById(id);
-    if (input) input.required = !topFlowsMode;
+    if (input) input.required = stockMode;
   });
+  ['mailApiKey', 'mailRecipient'].forEach((id) => {
+    const input = document.getElementById(id);
+    if (input) input.required = false;
+  });
+}
+
+function normalizeMonitorMode(mode) {
+  return ['stock-list', 'topflows', 'power-inflows'].includes(mode) ? mode : 'stock-list';
 }
 
 function addSymbolsFromInput() {
@@ -223,6 +253,49 @@ async function runAction(url, buttonId) {
     await refresh();
   } finally {
     button.disabled = false;
+  }
+}
+
+async function testEmail() {
+  const button = document.getElementById('testEmail');
+  const resendApiKey = document.getElementById('mailApiKey').value.trim();
+  const recipient = document.getElementById('mailRecipient').value.trim();
+  const hasSavedApiKey = Boolean(state.notifications?.email?.resendApiKeyConfigured);
+
+  if (!resendApiKey && !hasSavedApiKey) {
+    showSettingsMessage(t('emailApiKeyRequired'), true);
+    return;
+  }
+  if (!recipient) {
+    showSettingsMessage(t('emailRecipientRequired'), true);
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = t('testingEmail');
+  try {
+    const response = await fetch('/api/test-email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        notifications: {
+          email: {
+            resendApiKey,
+            recipient,
+          },
+        },
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(translateErrors(result.errors || [result.error || t('emailFailed')]).join('\n'));
+    }
+    showSettingsMessage(t('testEmailSent'), false);
+  } catch (error) {
+    showSettingsMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = t('testEmail');
   }
 }
 
@@ -288,6 +361,15 @@ function applyLanguage(language) {
   document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
     element.placeholder = t(element.dataset.i18nPlaceholder);
   });
+  updateMailApiKeyHelp();
+}
+
+function updateMailApiKeyHelp() {
+  const help = document.getElementById('mailApiKeyHelp');
+  if (!help) return;
+  help.textContent = state.notifications?.email?.resendApiKeyConfigured
+    ? t('mailApiKeyConfiguredHelp')
+    : t('mailApiKeyHelp');
 }
 
 function renderShell(status) {
@@ -326,17 +408,15 @@ function renderStatus(status) {
   warning.classList.toggle('hidden', errors.length === 0);
 
   const config = status.publicConfig || {};
-  const mode = config.monitor?.mode === 'topflows' ? 'topflows' : 'stock-list';
+  const mode = normalizeMonitorMode(config.monitor?.mode);
   document.getElementById('configPath').textContent = config.configPath || '-';
   document.getElementById('accountEmail').textContent = config.account?.email || '-';
-  document.getElementById('watchSymbolsLabel').textContent = mode === 'topflows' ? t('monitorMode') : t('symbols');
-  document.getElementById('watchSymbols').textContent = mode === 'topflows'
-    ? `${t('topFlowsMode')} / ${topFlowsTypeText(config.topFlows?.type)}`
-    : (config.monitor?.symbols || []).join(', ') || '-';
+  document.getElementById('watchSymbolsLabel').textContent = mode === 'stock-list' ? t('symbols') : t('monitorMode');
+  document.getElementById('watchSymbols').textContent = modeSummaryText(config);
   document.getElementById('interval').textContent = t('minutes', { value: config.monitor?.intervalMinutes || '-' });
-  document.getElementById('lookback').textContent = mode === 'topflows'
-    ? '-'
-    : t('minutes', { value: config.monitor?.lookbackMinutes || '-' });
+  document.getElementById('lookback').textContent = mode === 'stock-list'
+    ? t('minutes', { value: config.monitor?.lookbackMinutes || '-' })
+    : '-';
 
   renderLogs(status.logs || []);
 }
@@ -348,6 +428,10 @@ function renderResults(scan) {
 
   if (scan?.mode === 'topflows') {
     renderTopFlowsResults(scan);
+    return;
+  }
+  if (scan?.mode === 'power-inflows') {
+    renderPowerInflowsResults(scan);
     return;
   }
 
@@ -523,6 +607,88 @@ function renderTopFlowChangeNote(row, change, baseline) {
   return '-';
 }
 
+function renderPowerInflowsResults(scan) {
+  const summary = scan?.summary || {};
+  const rows = scan?.powerInflows?.rows || [];
+  const changes = scan?.powerInflows?.changes || {};
+  const notification = scan?.powerInflows?.notification || {};
+  const enteredSymbols = new Set((changes.entered || []).map((row) => row.symbol));
+
+  document.getElementById('resultsTitle').textContent = t('powerInflowsWatchlist');
+  document.getElementById('resultsHead').innerHTML = `
+    <th>${t('rank')}</th>
+    <th>${t('symbol')}</th>
+    <th>${t('topFlowsName')}</th>
+    <th>${t('tradeDate')}</th>
+    <th>${t('triggerTime')}</th>
+    <th>${t('price')}</th>
+    <th>${t('status')}</th>
+    <th>${t('reason')}</th>
+  `;
+  document.getElementById('symbolCount').textContent = rows.length
+    ? t('powerInflowsRows', { value: rows.length })
+    : '-';
+
+  document.getElementById('summary').innerHTML = [
+    [t('powerInflowsRowsLabel'), summary.POWER_INFLOW_ROWS || rows.length || 0],
+    [t('powerInflowsEntered'), summary.POWER_INFLOW_ENTERED || 0],
+    [t('powerInflowsExited'), summary.POWER_INFLOW_EXITED || 0],
+    [t('emailStatus'), emailStatusText(notification)],
+  ].map(([label, value]) => `
+    <div class="summary-item">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `).join('');
+
+  const body = document.getElementById('resultsBody');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="8" class="empty">${t('waitingResults')}</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map((row) => renderPowerInflowRow(row, enteredSymbols.has(row.symbol), changes.baseline)).join('');
+}
+
+function renderPowerInflowRow(row, entered, baseline) {
+  const status = baseline
+    ? t('powerInflowsBaseline')
+    : entered ? t('powerInflowsEntered') : t('powerInflowsExisting');
+  const badge = entered ? `<span class="change-badge entered">${t('powerInflowsEntered')}</span>` : '';
+  return `
+    <tr>
+      <td class="metric">${escapeHtml(row.rank || '-')}</td>
+      <td><strong>${escapeHtml(row.symbol)}</strong> ${badge}</td>
+      <td class="topflow-name">${escapeHtml(row.name || '-')}</td>
+      <td class="metric">${escapeHtml(row.date || '-')}</td>
+      <td class="metric">${escapeHtml(row.time || '-')}</td>
+      <td class="metric">${row.price ? fixed(row.price) : '-'}</td>
+      <td>${escapeHtml(status)}</td>
+      <td class="reason">${escapeHtml(powerInflowRawSummary(row.raw))}</td>
+    </tr>
+  `;
+}
+
+function powerInflowRawSummary(raw = {}) {
+  return Object.entries(raw)
+    .filter(([key]) => !['SYMBOL', 'NAME', 'DATE', 'TIME'].includes(key.toUpperCase()))
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(' / ') || '-';
+}
+
+function emailStatusText(notification = {}) {
+  if (!notification.enabled) return t('emailRecipientMissing');
+  if (notification.sent) return t('emailSent');
+  if (notification.error) return t('emailFailed');
+  if (notification.skippedReason === 'api_key_missing' || notification.skippedReason === 'sender_missing') {
+    return t('emailApiKeyMissing');
+  }
+  if (notification.skippedReason === 'baseline') return t('emailSkippedBaseline');
+  if (notification.skippedReason === 'no_entered') return t('emailSkippedNoEntered');
+  return t('emailRecipientConfigured');
+}
+
 function renderPricePlan(plan) {
   if (!plan || plan.enabled === false || plan.status === 'NO_DATA') {
     return `<span class="muted">${t(`pricePlanStatus${plan?.status || 'NO_DATA'}`)}</span>`;
@@ -649,6 +815,16 @@ function topFlowsTypeText(type) {
     2: 'NASDAQ',
     3: 'ETF',
   }[Number(type)] || 'ALL';
+}
+
+function modeSummaryText(config) {
+  const mode = normalizeMonitorMode(config.monitor?.mode);
+  if (mode === 'topflows') return `${t('topFlowsMode')} / ${topFlowsTypeText(config.topFlows?.type)}`;
+  if (mode === 'power-inflows') {
+    const recipient = config.notifications?.email?.recipient || t('emailRecipientMissing');
+    return `${t('powerInflowsMode')} / ${recipient}`;
+  }
+  return (config.monitor?.symbols || []).join(', ') || '-';
 }
 
 function escapeHtml(value) {

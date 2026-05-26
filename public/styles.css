@@ -191,6 +191,39 @@ h2 {
   gap: 14px;
 }
 
+.email-settings {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfe;
+  padding: 12px;
+}
+
+.section-title {
+  display: grid;
+  gap: 4px;
+}
+
+.email-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setup-form .inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-form .inline-check input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+}
+
 .symbol-editor {
   display: grid;
   gap: 8px;

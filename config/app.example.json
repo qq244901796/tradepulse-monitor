@@ -23,6 +23,15 @@
   "topFlows": {
     "type": 0
   },
+  "powerInflows": {
+    "source": "export-type-1"
+  },
+  "notifications": {
+    "email": {
+      "recipient": "",
+      "resendApiKey": ""
+    }
+  },
   "server": {
     "host": "127.0.0.1",
     "port": 14587

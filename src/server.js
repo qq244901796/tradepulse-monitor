@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, saveConfig } from './config.js';
+import { DEFAULT_CONFIG, loadConfig, saveConfig } from './config.js';
+import { sendResendMail } from './email-resend.js';
 import { MonitorService } from './monitor.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +82,19 @@ async function route(req, res) {
         },
       };
     }
+    if (
+      body?.notifications?.email
+    ) {
+      const submittedEmail = body.notifications.email || {};
+      const currentEmail = currentConfig.notifications?.email || {};
+      body = {
+        ...body,
+        notifications: {
+          ...(body.notifications || {}),
+          email: mergeEmailConfig(currentEmail, submittedEmail),
+        },
+      };
+    }
     const saved = saveConfig(rootDir, body);
     if (!saved.ok) {
       sendJson(res, 400, {
@@ -94,6 +108,42 @@ async function route(req, res) {
       ok: true,
       configPath: saved.configPath,
       status,
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/test-email') {
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        ok: false,
+        errors: [error.message],
+      });
+      return;
+    }
+
+    const currentConfig = loadConfig(rootDir).config;
+    const emailConfig = mergeEmailConfig(
+      currentConfig.notifications?.email || {},
+      body?.notifications?.email || body?.email || {},
+    );
+    const errors = [];
+    if (!emailConfig.resendApiKey) errors.push('notifications.email.resendApiKey is required.');
+    if (!emailConfig.recipient) errors.push('notifications.email.recipient is required.');
+    if (errors.length) {
+      sendJson(res, 400, {
+        ok: false,
+        errors,
+      });
+      return;
+    }
+
+    const result = await sendResendMail(emailConfig, buildTestEmail());
+    sendJson(res, 200, {
+      ok: true,
+      id: result.id || '',
     });
     return;
   }
@@ -242,6 +292,48 @@ function contentType(filePath) {
   if (ext === '.json') return 'application/json; charset=utf-8';
   if (ext === '.svg') return 'image/svg+xml';
   return 'application/octet-stream';
+}
+
+function mergeEmailConfig(currentEmail = {}, submittedEmail = {}) {
+  const resendApiKey = String(submittedEmail.resendApiKey || '').trim()
+    || String(currentEmail.resendApiKey || '').trim();
+  const hasSubmittedRecipient = hasOwn(submittedEmail, 'recipient') || hasOwn(submittedEmail, 'to');
+  const recipient = String(
+    hasSubmittedRecipient
+      ? (submittedEmail.recipient || submittedEmail.to || '')
+      : (currentEmail.recipient || currentEmail.to || ''),
+  ).trim();
+  const from = String(
+    submittedEmail.from
+    || currentEmail.from
+    || DEFAULT_CONFIG.notifications.email.from,
+  ).trim();
+
+  return {
+    ...currentEmail,
+    ...submittedEmail,
+    recipient,
+    resendApiKey,
+    from,
+  };
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function buildTestEmail() {
+  const sentAt = new Date().toLocaleString('zh-CN', { hour12: false });
+  return {
+    subject: 'TradePulse 邮件测试',
+    text: [
+      '这是一封 TradePulse Monitor 测试邮件。',
+      '',
+      '如果你收到这封邮件，说明 Resend API Key 和收件邮箱可以正常使用。',
+      '',
+      `发送时间：${sentAt}`,
+    ].join('\n'),
+  };
 }
 
 server.listen(port, host, () => {

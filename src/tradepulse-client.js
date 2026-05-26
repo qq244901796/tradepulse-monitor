@@ -216,6 +216,15 @@ export class TradePulseClient {
     };
   }
 
+  async getPowerInflows({ date } = {}) {
+    if (!date) throw new Error('Power Inflows date is required.');
+    return this.exportCsv({
+      symbols: '*',
+      date,
+      type: 1,
+    });
+  }
+
   async request(url, options = {}) {
     const headers = new Headers(options.headers || {});
     const cookie = this.jar.getCookieHeader(url);

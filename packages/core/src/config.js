@@ -23,6 +23,16 @@ export const DEFAULT_CONFIG = {
   topFlows: {
     type: 0,
   },
+  powerInflows: {
+    source: 'export-type-1',
+  },
+  notifications: {
+    email: {
+      recipient: '',
+      resendApiKey: '',
+      from: 'TradePulse Monitor <onboarding@resend.dev>',
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: 14587,
@@ -33,7 +43,7 @@ export const DEFAULT_CONFIG = {
 };
 
 export const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US'];
-export const SUPPORTED_MONITOR_MODES = ['stock-list', 'topflows'];
+export const SUPPORTED_MONITOR_MODES = ['stock-list', 'topflows', 'power-inflows'];
 
 export function normalizeConfig(input) {
   const config = clone(DEFAULT_CONFIG);
@@ -55,6 +65,23 @@ export function normalizeConfig(input) {
     config.topFlows = clone(DEFAULT_CONFIG.topFlows);
   }
   config.topFlows.type = Number(config.topFlows.type);
+  if (!config.powerInflows || typeof config.powerInflows !== 'object' || Array.isArray(config.powerInflows)) {
+    config.powerInflows = clone(DEFAULT_CONFIG.powerInflows);
+  }
+  config.powerInflows.source = String(config.powerInflows.source || DEFAULT_CONFIG.powerInflows.source);
+  if (!config.notifications || typeof config.notifications !== 'object' || Array.isArray(config.notifications)) {
+    config.notifications = clone(DEFAULT_CONFIG.notifications);
+  }
+  if (!config.notifications.email || typeof config.notifications.email !== 'object' || Array.isArray(config.notifications.email)) {
+    config.notifications.email = clone(DEFAULT_CONFIG.notifications.email);
+  }
+  config.notifications.email.recipient = String(
+    config.notifications.email.recipient
+    || config.notifications.email.to
+    || '',
+  ).trim();
+  config.notifications.email.resendApiKey = String(config.notifications.email.resendApiKey || '').trim();
+  config.notifications.email.from = String(config.notifications.email.from || DEFAULT_CONFIG.notifications.email.from).trim();
   config.server.host = String(config.server.host || DEFAULT_CONFIG.server.host);
   config.server.port = Number(config.server.port || DEFAULT_CONFIG.server.port);
   config.ui.language = normalizeLanguage(config.ui.language);
@@ -67,7 +94,7 @@ export function validateConfig(config) {
   if (!config.account.email) errors.push('account.email is required.');
   if (!config.account.password) errors.push('account.password is required.');
   if (!SUPPORTED_MONITOR_MODES.includes(config.monitor.mode)) {
-    errors.push('monitor.mode must be stock-list or topflows.');
+    errors.push('monitor.mode must be stock-list, topflows, or power-inflows.');
   }
   if (config.monitor.mode === 'stock-list' && !config.monitor.symbols.length) {
     errors.push('monitor.symbols must contain at least one symbol.');
@@ -96,6 +123,9 @@ export function validateConfig(config) {
   if (!Number.isFinite(config.topFlows.type) || ![0, 1, 2, 3].includes(config.topFlows.type)) {
     errors.push('topFlows.type must be 0, 1, 2, or 3.');
   }
+  if (config.powerInflows.source !== 'export-type-1') {
+    errors.push('powerInflows.source must be export-type-1.');
+  }
   if (!Number.isInteger(config.server.port) || config.server.port < 1 || config.server.port > 65535) {
     errors.push('server.port must be a valid TCP port.');
   }
@@ -117,6 +147,14 @@ export function publicConfig(config, configPath) {
     rules: config.rules,
     pricePlan: config.pricePlan,
     topFlows: config.topFlows,
+    powerInflows: config.powerInflows,
+    notifications: {
+      email: {
+        recipient: config.notifications.email.recipient,
+        resendApiKeyConfigured: Boolean(config.notifications.email.resendApiKey),
+        senderConfigured: Boolean(config.notifications.email.resendApiKey),
+      },
+    },
     server: config.server,
     ui: config.ui,
   };

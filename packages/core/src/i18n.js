@@ -23,6 +23,14 @@ export const I18N = {
     monitorMode: '\u76d1\u63a7\u6a21\u5f0f',
     stockListMode: '\u80a1\u7968\u5217\u8868',
     topFlowsMode: 'Top Flows',
+    powerInflowsMode: 'Power Inflows',
+    powerInflowsWatchlist: 'Power Inflows 榜单',
+    powerInflowsRows: '{value} 条',
+    powerInflowsRowsLabel: '榜单数量',
+    powerInflowsEntered: '新进榜',
+    powerInflowsExited: '离开榜单',
+    powerInflowsExisting: '已在榜',
+    powerInflowsBaseline: '首次扫描基线',
     topFlowsWatchlist: 'Top Flows \u699c\u5355',
     topFlowsSummary: 'Top Flows \u53d8\u52a8',
     topFlowsRows: '{value} \u6761',
@@ -38,6 +46,31 @@ export const I18N = {
     momentum: 'Momentum',
     daily: 'Daily',
     topFlowsLargeDeal: 'Large Deal',
+    triggerTime: '触发时间',
+    status: '状态',
+    emailNotification: '邮件提醒',
+    emailNotificationHelp: '填写 Resend API Key 和接收 Power Inflows 新进榜提醒的邮箱。',
+    mailApiKey: 'Resend API Key',
+    mailApiKeyPlaceholder: '已有配置时可留空',
+    mailApiKeyHelp: '首次使用请填写 Resend API Key。',
+    mailApiKeyConfiguredHelp: '已保存 API Key。不填写表示继续使用当前 API Key。',
+    mailRecipient: '收件邮箱',
+    mailRecipientPlaceholder: '多个收件人用逗号分隔',
+    testEmail: '发送测试邮件',
+    testEmailHelp: '用当前填写的 API Key 和收件邮箱发送一封测试邮件。',
+    testingEmail: '发送中...',
+    testEmailSent: '测试邮件已发送，请检查收件箱。',
+    emailApiKeyRequired: '请填写 Resend API Key。',
+    emailRecipientRequired: '请填写收件邮箱。',
+    emailStatus: '邮件状态',
+    emailRecipientConfigured: '收件邮箱已配置',
+    emailRecipientMissing: '未配置收件邮箱',
+    emailApiKeyMissing: '未配置 Resend API Key',
+    emailSenderMissing: '未配置 Resend API Key',
+    emailSent: '已发送',
+    emailFailed: '发送失败',
+    emailSkippedBaseline: '首次基线不发送',
+    emailSkippedNoEntered: '无新进榜',
     pricePlanStatusREADY: '\u53ef\u6267\u884c',
     pricePlanStatusWATCH: '\u89c2\u5bdf\u4e2d',
     pricePlanStatusLOW_CONFIDENCE: '\u4fe1\u5fc3\u4e0d\u8db3',
@@ -55,6 +88,8 @@ export const I18N = {
     'reason.price_plan_extended': '\u73b0\u4ef7\u5df2\u660e\u663e\u9ad8\u4e8e\u7a81\u7834\u4ef7\uff0c\u8ffd\u4ef7\u98ce\u9669\u589e\u52a0\u3002',
     'reason.price_plan_wait_confirmation': '\u8fd8\u9700\u8981\u7b49\u5f85\u66f4\u660e\u786e\u7684\u673a\u6784\u4e70\u5165\u6216\u4ef7\u683c\u786e\u8ba4\u3002',
     'log.chart_data_failed': '\u66f2\u7ebf\u6570\u636e\u8bfb\u53d6\u5931\u8d25\uff08{symbol}\uff09\uff1a{message}\u3002',
+    'log.email_sent': '邮件提醒已发送：{count} 个新进榜。',
+    'log.email_failed': '邮件提醒发送失败：{message}',
     subtitle: '本地机构入场监控',
     language: '语言',
     settings: '设置',
@@ -170,6 +205,14 @@ export const I18N = {
     monitorMode: 'Monitor Mode',
     stockListMode: 'Stock List',
     topFlowsMode: 'Top Flows',
+    powerInflowsMode: 'Power Inflows',
+    powerInflowsWatchlist: 'Power Inflows List',
+    powerInflowsRows: '{value} rows',
+    powerInflowsRowsLabel: 'Rows',
+    powerInflowsEntered: 'Entered',
+    powerInflowsExited: 'Exited',
+    powerInflowsExisting: 'Already Listed',
+    powerInflowsBaseline: 'First Scan Baseline',
     topFlowsWatchlist: 'Top Flows List',
     topFlowsSummary: 'Top Flows Changes',
     topFlowsRows: '{value} rows',
@@ -185,6 +228,31 @@ export const I18N = {
     momentum: 'Momentum',
     daily: 'Daily',
     topFlowsLargeDeal: 'Large Deal',
+    triggerTime: 'Trigger Time',
+    status: 'Status',
+    emailNotification: 'Email Notification',
+    emailNotificationHelp: 'Enter the Resend API key and the email address that should receive new Power Inflows alerts.',
+    mailApiKey: 'Resend API Key',
+    mailApiKeyPlaceholder: 'Leave blank to keep the saved key',
+    mailApiKeyHelp: 'Enter your Resend API key the first time.',
+    mailApiKeyConfiguredHelp: 'API key is saved. Leave blank to keep using it.',
+    mailRecipient: 'Recipient Email',
+    mailRecipientPlaceholder: 'Separate multiple recipients with commas',
+    testEmail: 'Send Test Email',
+    testEmailHelp: 'Send one test email using the current API key and recipient.',
+    testingEmail: 'Sending...',
+    testEmailSent: 'Test email sent. Check the inbox.',
+    emailApiKeyRequired: 'Enter the Resend API key.',
+    emailRecipientRequired: 'Enter the recipient email.',
+    emailStatus: 'Email Status',
+    emailRecipientConfigured: 'Recipient Configured',
+    emailRecipientMissing: 'No Recipient',
+    emailApiKeyMissing: 'No Resend API Key',
+    emailSenderMissing: 'No Resend API Key',
+    emailSent: 'Sent',
+    emailFailed: 'Failed',
+    emailSkippedBaseline: 'Baseline; not sent',
+    emailSkippedNoEntered: 'No new entries',
     pricePlanStatusREADY: 'Ready',
     pricePlanStatusWATCH: 'Watching',
     pricePlanStatusLOW_CONFIDENCE: 'Low Confidence',
@@ -202,6 +270,8 @@ export const I18N = {
     'reason.price_plan_extended': 'Current price is already extended above breakout confirmation, so chase risk is higher.',
     'reason.price_plan_wait_confirmation': 'Wait for clearer institutional buying or price confirmation.',
     'log.chart_data_failed': 'Chart data failed ({symbol}): {message}.',
+    'log.email_sent': 'Email notification sent for {count} new entries.',
+    'log.email_failed': 'Email notification failed: {message}',
     subtitle: 'Local institutional-flow monitor',
     language: 'Language',
     settings: 'Settings',
@@ -344,10 +414,30 @@ export function translateError(message, language) {
     return language === 'zh-CN' ? '请至少添加一个股票代码。' : 'At least one symbol is required.';
   }
   if (/monitor\.mode/i.test(message)) {
-    return language === 'zh-CN' ? '监控模式只能选择股票列表或 Top Flows。' : 'Monitor mode must be Stock List or Top Flows.';
+    return language === 'zh-CN' ? '监控模式只能选择股票列表、Top Flows 或 Power Inflows。' : 'Monitor mode must be Stock List, Top Flows, or Power Inflows.';
   }
   if (/topFlows\.type/i.test(message)) {
     return language === 'zh-CN' ? 'Top Flows 类型只能是 ALL、NYSE、NASDAQ 或 ETF。' : 'Top Flows type must be ALL, NYSE, NASDAQ, or ETF.';
+  }
+  if (/Resend default sender can only send/i.test(message)) {
+    return language === 'zh-CN'
+      ? '当前 Resend 默认发件地址只能发送到该 Resend 账号自己的邮箱。请确认收件邮箱就是注册 Resend 的邮箱。'
+      : 'The default Resend sender can only send to the email address registered on this Resend account.';
+  }
+  if (/Resend API key is missing/i.test(message)) {
+    return language === 'zh-CN' ? '请填写 Resend API Key。' : 'Enter the Resend API key.';
+  }
+  if (/Email recipient is missing/i.test(message)) {
+    return language === 'zh-CN' ? '请填写收件邮箱。' : 'Enter the recipient email.';
+  }
+  if (/notifications\.email\.resendApiKey/i.test(message)) {
+    return language === 'zh-CN' ? '请填写 Resend API Key。' : 'Enter the Resend API key.';
+  }
+  if (/notifications\.email\.from/i.test(message)) {
+    return language === 'zh-CN' ? '发送服务发件人尚未配置。' : 'Resend sender is not configured.';
+  }
+  if (/notifications\.email\.recipient/i.test(message)) {
+    return language === 'zh-CN' ? '请填写收件邮箱。' : 'Email recipient is required.';
   }
   return message;
 }
