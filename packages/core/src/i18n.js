@@ -20,6 +20,24 @@ export const I18N = {
     pricePlanNotActionable: '\u7ee7\u7eed\u89c2\u5bdf',
     pricePlanSourceChart: 'Chart',
     pricePlanSourceExport: 'Export',
+    monitorMode: '\u76d1\u63a7\u6a21\u5f0f',
+    stockListMode: '\u80a1\u7968\u5217\u8868',
+    topFlowsMode: 'Top Flows',
+    topFlowsWatchlist: 'Top Flows \u699c\u5355',
+    topFlowsSummary: 'Top Flows \u53d8\u52a8',
+    topFlowsRows: '{value} \u6761',
+    topFlowsNoChange: '\u6682\u65e0\u699c\u5355\u53d8\u52a8',
+    topFlowsBaseline: '\u9996\u6b21\u626b\u63cf\uff0c\u5df2\u5efa\u7acb\u5bf9\u6bd4\u57fa\u7ebf',
+    topFlowsEntered: '\u65b0\u8fdb\u699c',
+    topFlowsExited: '\u79bb\u5f00\u699c\u5355',
+    topFlowsMoved: '\u540d\u6b21\u53d8\u52a8',
+    rank: '\u6392\u540d',
+    topFlowsName: '\u540d\u79f0',
+    changePct: '\u6da8\u8dcc',
+    score: 'Score',
+    momentum: 'Momentum',
+    daily: 'Daily',
+    topFlowsLargeDeal: 'Large Deal',
     pricePlanStatusREADY: '\u53ef\u6267\u884c',
     pricePlanStatusWATCH: '\u89c2\u5bdf\u4e2d',
     pricePlanStatusLOW_CONFIDENCE: '\u4fe1\u5fc3\u4e0d\u8db3',
@@ -130,7 +148,7 @@ export const I18N = {
     'log.config_reloaded': '配置已重载。',
     'log.config_reload_failed': '配置重载失败：{message}',
     'log.scan_started': '扫描开始（{trigger}）。',
-    'log.scan_finished': '扫描完成：{symbols} 个股票，用时 {durationMs}ms。',
+    'log.scan_finished': '扫描完成：{symbols} 条，用时 {durationMs}ms。',
     'log.scan_failed': '扫描失败：{message}',
     'log.export_session_expired': '导出会话已过期，正在重新登录。',
     'log.login_success': 'TradePulse 登录成功：{email}',
@@ -149,6 +167,24 @@ export const I18N = {
     pricePlanNotActionable: 'Keep watching',
     pricePlanSourceChart: 'Chart',
     pricePlanSourceExport: 'Export',
+    monitorMode: 'Monitor Mode',
+    stockListMode: 'Stock List',
+    topFlowsMode: 'Top Flows',
+    topFlowsWatchlist: 'Top Flows List',
+    topFlowsSummary: 'Top Flows Changes',
+    topFlowsRows: '{value} rows',
+    topFlowsNoChange: 'No list changes',
+    topFlowsBaseline: 'First scan; comparison baseline created',
+    topFlowsEntered: 'Entered',
+    topFlowsExited: 'Exited',
+    topFlowsMoved: 'Rank Changed',
+    rank: 'Rank',
+    topFlowsName: 'Name',
+    changePct: 'Chg.',
+    score: 'Score',
+    momentum: 'Momentum',
+    daily: 'Daily',
+    topFlowsLargeDeal: 'Large Deal',
     pricePlanStatusREADY: 'Ready',
     pricePlanStatusWATCH: 'Watching',
     pricePlanStatusLOW_CONFIDENCE: 'Low Confidence',
@@ -259,7 +295,7 @@ export const I18N = {
     'log.config_reloaded': 'Config reloaded.',
     'log.config_reload_failed': 'Config reload failed: {message}',
     'log.scan_started': 'Scan started ({trigger}).',
-    'log.scan_finished': 'Scan finished: {symbols} symbols in {durationMs}ms.',
+    'log.scan_finished': 'Scan finished: {symbols} items in {durationMs}ms.',
     'log.scan_failed': 'Scan failed: {message}',
     'log.export_session_expired': 'Export session expired; logging in again.',
     'log.login_success': 'Logged in to TradePulse as {email}.',
@@ -306,6 +342,12 @@ export function translateError(message, language) {
   }
   if (/monitor\.symbols/i.test(message)) {
     return language === 'zh-CN' ? '请至少添加一个股票代码。' : 'At least one symbol is required.';
+  }
+  if (/monitor\.mode/i.test(message)) {
+    return language === 'zh-CN' ? '监控模式只能选择股票列表或 Top Flows。' : 'Monitor mode must be Stock List or Top Flows.';
+  }
+  if (/topFlows\.type/i.test(message)) {
+    return language === 'zh-CN' ? 'Top Flows 类型只能是 ALL、NYSE、NASDAQ 或 ETF。' : 'Top Flows type must be ALL, NYSE, NASDAQ, or ETF.';
   }
   return message;
 }

@@ -4,8 +4,15 @@ import { analyzeRows, isTriggeredSignal } from '../packages/core/src/analyzer.js
 import { loadConfig, publicConfig } from './config.js';
 import { parseCsv } from '../packages/core/src/csv.js';
 import { AuthRequiredError, TradePulseClient } from './tradepulse-client.js';
+import {
+  compareTopFlowSnapshots,
+  normalizeTopFlowRows,
+  normalizeTopFlowsType,
+  summarizeTopFlowChanges,
+  topFlowsTypeLabel,
+} from './topflows.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 
 export class MonitorService {
   constructor({ rootDir }) {
@@ -16,6 +23,7 @@ export class MonitorService {
     this.timer = null;
     this.startedAt = new Date().toISOString();
     this.seenSignals = new Set();
+    this.topFlowsSnapshot = null;
     this.history = [];
     this.logs = [];
     this.state = {
@@ -125,7 +133,7 @@ export class MonitorService {
       this.appendHistory(result);
       this.state.schedule.lastRunFinishedAt = new Date().toISOString();
       this.log('info', 'scan_finished', {
-        symbols: result.results.length,
+        symbols: result.results.length || result.topFlows?.rows?.length || 0,
         durationMs: result.durationMs,
       });
       return {
@@ -152,6 +160,13 @@ export class MonitorService {
   }
 
   async runScan(trigger) {
+    if (this.config.monitor.mode === 'topflows') {
+      return this.runTopFlowsScan(trigger);
+    }
+    return this.runStockListScan(trigger);
+  }
+
+  async runStockListScan(trigger) {
     const started = Date.now();
     await this.ensureLoggedIn();
 
@@ -190,6 +205,46 @@ export class MonitorService {
       },
       results,
       summary: summarizeSignals(results),
+    };
+  }
+
+  async runTopFlowsScan(trigger) {
+    const started = Date.now();
+    await this.ensureLoggedIn();
+
+    const type = normalizeTopFlowsType(this.config.topFlows?.type);
+    const topFlows = await this.client.getTopFlows({ type });
+    const rows = normalizeTopFlowRows(topFlows.rows);
+    const previousRows = this.topFlowsSnapshot?.type === type ? this.topFlowsSnapshot.rows : [];
+    const changes = compareTopFlowSnapshots(previousRows, rows);
+    const generatedAt = new Date().toISOString();
+    this.topFlowsSnapshot = {
+      generatedAt,
+      type,
+      rows,
+    };
+
+    return {
+      id: `${Date.now()}`,
+      mode: 'topflows',
+      trigger,
+      generatedAt,
+      tradeDate: generatedAt.slice(0, 10),
+      durationMs: Date.now() - started,
+      source: {
+        topFlowsUrl: topFlows.url,
+        topFlowsType: type,
+        topFlowsLabel: topFlowsTypeLabel(type),
+        topFlowRows: rows.length,
+      },
+      topFlows: {
+        type,
+        label: topFlowsTypeLabel(type),
+        rows,
+        changes,
+      },
+      results: [],
+      summary: summarizeTopFlowChanges(changes),
     };
   }
 
@@ -314,6 +369,15 @@ export class MonitorService {
         try {
           const record = JSON.parse(line);
           this.history.unshift(summarizeScan(record));
+          if (record.mode === 'topflows' && record.topFlows?.rows?.length) {
+            if (!this.topFlowsSnapshot || String(record.generatedAt).localeCompare(this.topFlowsSnapshot.generatedAt) > 0) {
+              this.topFlowsSnapshot = {
+                generatedAt: record.generatedAt,
+                type: record.topFlows.type,
+                rows: record.topFlows.rows,
+              };
+            }
+          }
           for (const result of record.results || []) {
             if (isTriggeredSignal(result.signal)) {
               this.seenSignals.add(`${result.date}|${result.symbol}|${result.signal}`);
@@ -360,8 +424,26 @@ function summarizeSignals(results) {
 }
 
 function summarizeScan(result) {
+  if (result.mode === 'topflows') {
+    return {
+      id: result.id,
+      mode: result.mode,
+      generatedAt: result.generatedAt,
+      tradeDate: result.tradeDate,
+      durationMs: result.durationMs,
+      trigger: result.trigger,
+      summary: result.summary,
+      topFlows: {
+        label: result.topFlows?.label || 'ALL',
+        rowCount: result.topFlows?.rows?.length || 0,
+        changes: result.topFlows?.changes || summarizeTopFlowChanges(),
+      },
+    };
+  }
+
   return {
     id: result.id,
+    mode: result.mode || 'stock-list',
     generatedAt: result.generatedAt,
     tradeDate: result.tradeDate,
     durationMs: result.durationMs,

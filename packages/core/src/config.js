@@ -4,6 +4,7 @@ export const DEFAULT_CONFIG = {
     password: '',
   },
   monitor: {
+    mode: 'stock-list',
     symbols: ['AAPL'],
     intervalMinutes: 5,
     lookbackMinutes: 30,
@@ -19,6 +20,9 @@ export const DEFAULT_CONFIG = {
     stopBufferPct: 1.5,
     minConfidence: 60,
   },
+  topFlows: {
+    type: 0,
+  },
   server: {
     host: '127.0.0.1',
     port: 14587,
@@ -29,12 +33,14 @@ export const DEFAULT_CONFIG = {
 };
 
 export const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US'];
+export const SUPPORTED_MONITOR_MODES = ['stock-list', 'topflows'];
 
 export function normalizeConfig(input) {
   const config = clone(DEFAULT_CONFIG);
   mergeObject(config, input || {});
   config.account.email = String(config.account.email || '').trim();
   config.account.password = String(config.account.password || '');
+  config.monitor.mode = normalizeMonitorMode(config.monitor.mode);
   config.monitor.symbols = normalizeSymbols(config.monitor.symbols);
   config.monitor.intervalMinutes = Number(config.monitor.intervalMinutes);
   config.monitor.lookbackMinutes = Number(config.monitor.lookbackMinutes);
@@ -45,6 +51,10 @@ export function normalizeConfig(input) {
   config.pricePlan.pullbackTolerancePct = Number(config.pricePlan.pullbackTolerancePct);
   config.pricePlan.stopBufferPct = Number(config.pricePlan.stopBufferPct);
   config.pricePlan.minConfidence = Number(config.pricePlan.minConfidence);
+  if (!config.topFlows || typeof config.topFlows !== 'object' || Array.isArray(config.topFlows)) {
+    config.topFlows = clone(DEFAULT_CONFIG.topFlows);
+  }
+  config.topFlows.type = Number(config.topFlows.type);
   config.server.host = String(config.server.host || DEFAULT_CONFIG.server.host);
   config.server.port = Number(config.server.port || DEFAULT_CONFIG.server.port);
   config.ui.language = normalizeLanguage(config.ui.language);
@@ -56,7 +66,12 @@ export function validateConfig(config) {
 
   if (!config.account.email) errors.push('account.email is required.');
   if (!config.account.password) errors.push('account.password is required.');
-  if (!config.monitor.symbols.length) errors.push('monitor.symbols must contain at least one symbol.');
+  if (!SUPPORTED_MONITOR_MODES.includes(config.monitor.mode)) {
+    errors.push('monitor.mode must be stock-list or topflows.');
+  }
+  if (config.monitor.mode === 'stock-list' && !config.monitor.symbols.length) {
+    errors.push('monitor.symbols must contain at least one symbol.');
+  }
   if (!Number.isFinite(config.monitor.intervalMinutes) || config.monitor.intervalMinutes < 1) {
     errors.push('monitor.intervalMinutes must be at least 1.');
   }
@@ -78,6 +93,9 @@ export function validateConfig(config) {
   if (!Number.isFinite(config.pricePlan.minConfidence) || config.pricePlan.minConfidence < 0 || config.pricePlan.minConfidence > 100) {
     errors.push('pricePlan.minConfidence must be between 0 and 100.');
   }
+  if (!Number.isFinite(config.topFlows.type) || ![0, 1, 2, 3].includes(config.topFlows.type)) {
+    errors.push('topFlows.type must be 0, 1, 2, or 3.');
+  }
   if (!Number.isInteger(config.server.port) || config.server.port < 1 || config.server.port > 65535) {
     errors.push('server.port must be a valid TCP port.');
   }
@@ -98,6 +116,7 @@ export function publicConfig(config, configPath) {
     monitor: config.monitor,
     rules: config.rules,
     pricePlan: config.pricePlan,
+    topFlows: config.topFlows,
     server: config.server,
     ui: config.ui,
   };
@@ -115,6 +134,10 @@ export function normalizeSymbols(symbols) {
 
 export function normalizeLanguage(language) {
   return SUPPORTED_LANGUAGES.includes(language) ? language : DEFAULT_CONFIG.ui.language;
+}
+
+export function normalizeMonitorMode(mode) {
+  return SUPPORTED_MONITOR_MODES.includes(mode) ? mode : DEFAULT_CONFIG.monitor.mode;
 }
 
 function mergeObject(target, source) {

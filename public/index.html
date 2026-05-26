@@ -47,7 +47,15 @@
           <small data-i18n="passwordHelp">已有配置时不填表示保留当前密码。首次配置必须填写密码。</small>
         </label>
 
-        <div class="symbol-editor">
+        <label>
+          <span data-i18n="monitorMode">监控模式</span>
+          <select id="configMode" name="mode">
+            <option value="stock-list" data-i18n="stockListMode">股票列表</option>
+            <option value="topflows" data-i18n="topFlowsMode">Top Flows</option>
+          </select>
+        </label>
+
+        <div id="symbolEditor" class="symbol-editor stock-only">
           <label for="symbolInput">
             <span data-i18n="symbols">股票列表</span>
           </label>
@@ -63,15 +71,15 @@
             <span data-i18n="intervalMinutes">扫描周期（分钟）</span>
             <input id="configInterval" name="intervalMinutes" type="number" min="1" value="5" required>
           </label>
-          <label>
+          <label class="stock-only">
             <span data-i18n="lookbackMinutes">回看分钟</span>
             <input id="configLookback" name="lookbackMinutes" type="number" min="1" value="30" required>
           </label>
-          <label>
+          <label class="stock-only">
             <span data-i18n="entryScore">入场阈值</span>
             <input id="configEntryScore" name="minBuyScoreForEntry" type="number" min="0" max="100" value="45" required>
           </label>
-          <label>
+          <label class="stock-only">
             <span data-i18n="strongScore">强入场阈值</span>
             <input id="configStrongScore" name="minBuyScoreForStrongEntry" type="number" min="0" max="100" value="70" required>
           </label>
@@ -116,13 +124,13 @@
 
     <section class="panel wide monitor-panel">
       <div class="panel-head">
-        <h2 data-i18n="watchlist">股票监控</h2>
+        <h2 id="resultsTitle" data-i18n="watchlist">股票监控</h2>
         <span id="symbolCount" class="muted">-</span>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr>
+            <tr id="resultsHead">
               <th data-i18n="symbol">股票</th>
               <th data-i18n="signal">信号</th>
               <th data-i18n="buyScore">买入分</th>
@@ -148,7 +156,7 @@
       </div>
       <dl class="kv">
         <div><dt data-i18n="account">账号</dt><dd id="accountEmail">-</dd></div>
-        <div><dt data-i18n="symbols">股票列表</dt><dd id="watchSymbols">-</dd></div>
+        <div><dt id="watchSymbolsLabel" data-i18n="symbols">股票列表</dt><dd id="watchSymbols">-</dd></div>
         <div><dt data-i18n="interval">周期</dt><dd id="interval">-</dd></div>
         <div><dt data-i18n="lookback">回看</dt><dd id="lookback">-</dd></div>
       </dl>

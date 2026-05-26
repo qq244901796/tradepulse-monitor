@@ -11,9 +11,13 @@ const state = {
   settingsOpen: false,
   setupMode: false,
   language: localStorage.getItem('language') || 'zh-CN',
+  monitorMode: 'stock-list',
   symbols: [],
+  topFlows: { type: 0 },
   pricePlan: null,
   settingsDirty: false,
+  lastStatus: null,
+  lastResults: null,
 };
 
 document.getElementById('scanNow').addEventListener('click', () => runAction('/api/scan-now', 'scanNow'));
@@ -22,6 +26,7 @@ document.getElementById('closeSettings').addEventListener('click', closeSettings
 document.getElementById('shutdown').addEventListener('click', shutdownServer);
 document.getElementById('settingsForm').addEventListener('submit', saveSettings);
 document.getElementById('languageSelect').addEventListener('change', changeLanguage);
+document.getElementById('configMode').addEventListener('change', handleModeChange);
 document.getElementById('addSymbol').addEventListener('click', addSymbolsFromInput);
 document.getElementById('symbolInput').addEventListener('keydown', handleSymbolKeydown);
 document.getElementById('symbolInput').addEventListener('paste', () => setTimeout(addSymbolsFromInput, 0));
@@ -38,11 +43,13 @@ async function refresh() {
   state.loading = true;
   try {
     const status = await getJson('/api/status');
+    state.lastStatus = status;
     setLanguageFromStatus(status);
     renderShell(status);
     populateSettings(status);
     if (!status.needsSetup && status.configOk) {
       const results = await getJson('/api/results');
+      state.lastResults = results;
       renderStatus(status);
       renderResults(results);
     }
@@ -57,7 +64,8 @@ async function saveSettings(event) {
   event.preventDefault();
   const button = document.getElementById('saveSettings');
   const errorBox = document.getElementById('settingsError');
-  if (!state.symbols.length) {
+  const mode = document.getElementById('configMode').value;
+  if (mode === 'stock-list' && !state.symbols.length) {
     showSettingsMessage(t('emptySymbols'), true);
     return;
   }
@@ -92,12 +100,14 @@ async function saveSettings(event) {
 }
 
 function readSettingsForm() {
+  const mode = document.getElementById('configMode').value;
   return {
     account: {
       email: document.getElementById('configEmail').value.trim(),
       password: document.getElementById('configPassword').value,
     },
     monitor: {
+      mode,
       symbols: state.symbols,
       intervalMinutes: Number(document.getElementById('configInterval').value),
       lookbackMinutes: Number(document.getElementById('configLookback').value),
@@ -108,6 +118,7 @@ function readSettingsForm() {
       minBuyScoreForStrongEntry: Number(document.getElementById('configStrongScore').value),
     },
     pricePlan: state.pricePlan || undefined,
+    topFlows: state.topFlows || { type: 0 },
     server: {
       host: '127.0.0.1',
       port: 14587,
@@ -124,6 +135,9 @@ function populateSettings(status, force = false) {
   const monitor = config.monitor || {};
   const rules = config.rules || {};
   state.pricePlan = config.pricePlan || null;
+  state.topFlows = config.topFlows || { type: 0 };
+  state.monitorMode = monitor.mode === 'topflows' ? 'topflows' : 'stock-list';
+  document.getElementById('configMode').value = state.monitorMode;
   document.getElementById('configEmail').value = config.account?.email || '';
   document.getElementById('configPassword').value = '';
   document.getElementById('configInterval').value = monitor.intervalMinutes || 5;
@@ -131,7 +145,25 @@ function populateSettings(status, force = false) {
   document.getElementById('configEntryScore').value = rules.minBuyScoreForEntry || 45;
   document.getElementById('configStrongScore').value = rules.minBuyScoreForStrongEntry || 70;
   state.symbols = [...(monitor.symbols || ['AAPL'])];
+  renderModeFields();
   renderSymbolTags();
+}
+
+function handleModeChange(event) {
+  state.monitorMode = event.target.value === 'topflows' ? 'topflows' : 'stock-list';
+  state.settingsDirty = true;
+  renderModeFields();
+}
+
+function renderModeFields() {
+  const topFlowsMode = state.monitorMode === 'topflows';
+  document.querySelectorAll('.stock-only').forEach((element) => {
+    element.classList.toggle('hidden', topFlowsMode);
+  });
+  ['configLookback', 'configEntryScore', 'configStrongScore'].forEach((id) => {
+    const input = document.getElementById(id);
+    if (input) input.required = !topFlowsMode;
+  });
 }
 
 function addSymbolsFromInput() {
@@ -207,15 +239,16 @@ async function changeLanguage(event) {
   localStorage.setItem('language', language);
   applyLanguage(language);
   renderSymbolTags();
+  renderModeFields();
+  rerenderCachedView();
 
   if (state.settingsDirty || state.setupMode) return;
 
-  await fetch('/api/language', {
+  fetch('/api/language', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ language }),
   }).catch(() => {});
-  await refresh();
 }
 
 async function getJson(url) {
@@ -234,6 +267,15 @@ function setLanguageFromStatus(status) {
     localStorage.setItem('language', language);
   }
   applyLanguage(state.language);
+}
+
+function rerenderCachedView() {
+  if (!state.lastStatus) return;
+  renderShell(state.lastStatus);
+  if (!state.lastStatus.needsSetup && state.lastStatus.configOk) {
+    renderStatus(state.lastStatus);
+    renderResults(state.lastResults);
+  }
 }
 
 function applyLanguage(language) {
@@ -284,20 +326,48 @@ function renderStatus(status) {
   warning.classList.toggle('hidden', errors.length === 0);
 
   const config = status.publicConfig || {};
+  const mode = config.monitor?.mode === 'topflows' ? 'topflows' : 'stock-list';
   document.getElementById('configPath').textContent = config.configPath || '-';
   document.getElementById('accountEmail').textContent = config.account?.email || '-';
-  document.getElementById('watchSymbols').textContent = (config.monitor?.symbols || []).join(', ') || '-';
+  document.getElementById('watchSymbolsLabel').textContent = mode === 'topflows' ? t('monitorMode') : t('symbols');
+  document.getElementById('watchSymbols').textContent = mode === 'topflows'
+    ? `${t('topFlowsMode')} / ${topFlowsTypeText(config.topFlows?.type)}`
+    : (config.monitor?.symbols || []).join(', ') || '-';
   document.getElementById('interval').textContent = t('minutes', { value: config.monitor?.intervalMinutes || '-' });
-  document.getElementById('lookback').textContent = t('minutes', { value: config.monitor?.lookbackMinutes || '-' });
+  document.getElementById('lookback').textContent = mode === 'topflows'
+    ? '-'
+    : t('minutes', { value: config.monitor?.lookbackMinutes || '-' });
 
   renderLogs(status.logs || []);
 }
 
 function renderResults(scan) {
-  const summary = scan?.summary || {};
   document.getElementById('scanMeta').textContent = scan
     ? `${formatDateTime(scan.generatedAt)} / ${scan.durationMs || 0}ms`
     : t('noScan');
+
+  if (scan?.mode === 'topflows') {
+    renderTopFlowsResults(scan);
+    return;
+  }
+
+  renderStockResults(scan);
+}
+
+function renderStockResults(scan) {
+  const summary = scan?.summary || {};
+  document.getElementById('resultsTitle').textContent = t('watchlist');
+  document.getElementById('resultsHead').innerHTML = `
+    <th>${t('symbol')}</th>
+    <th>${t('signal')}</th>
+    <th>${t('buyScore')}</th>
+    <th>${t('sellScore')}</th>
+    <th>${t('price')}</th>
+    <th>${t('largeDeal')}</th>
+    <th>${t('recentLargeDeal')}</th>
+    <th>${t('pricePlan')}</th>
+    <th>${t('reason')}</th>
+  `;
   document.getElementById('symbolCount').textContent = scan?.results?.length
     ? t('symbolCount', { value: scan.results.length })
     : '-';
@@ -342,6 +412,115 @@ function renderResults(scan) {
       </tr>
     `;
   }).join('');
+}
+
+function renderTopFlowsResults(scan) {
+  const summary = scan?.summary || {};
+  const rows = scan?.topFlows?.rows || [];
+  const changes = scan?.topFlows?.changes || {};
+  const changeMap = buildTopFlowChangeMap(changes);
+
+  document.getElementById('resultsTitle').textContent = t('topFlowsWatchlist');
+  document.getElementById('resultsHead').innerHTML = `
+    <th>${t('rank')}</th>
+    <th>${t('symbol')}</th>
+    <th>${t('topFlowsName')}</th>
+    <th>${t('price')}</th>
+    <th>${t('score')}</th>
+    <th>${t('momentum')}</th>
+    <th>${t('daily')}</th>
+    <th>${t('topFlowsLargeDeal')}</th>
+    <th>${t('reason')}</th>
+  `;
+  document.getElementById('symbolCount').textContent = rows.length
+    ? t('topFlowsRows', { value: rows.length })
+    : '-';
+
+  const entered = changes.entered?.length ?? summary.TOPFLOWS_ENTERED ?? 0;
+  const exited = changes.exited?.length ?? summary.TOPFLOWS_EXITED ?? 0;
+  const moved = changes.rankChanged?.length ?? summary.TOPFLOWS_RANK_CHANGED ?? 0;
+  const total = changes.total ?? summary.TOPFLOWS_TOTAL_CHANGES ?? 0;
+  document.getElementById('summary').innerHTML = [
+    [t('topFlowsSummary'), total],
+    [t('topFlowsEntered'), entered],
+    [t('topFlowsExited'), exited],
+    [t('topFlowsMoved'), moved],
+  ].map(([label, value]) => `
+    <div class="summary-item">
+      <span>${escapeHtml(label)}</span>
+      <strong>${value}</strong>
+    </div>
+  `).join('');
+
+  const body = document.getElementById('resultsBody');
+  if (!rows.length && !changes.exited?.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty">${t('waitingResults')}</td></tr>`;
+    return;
+  }
+
+  const currentRows = rows.map((row) => renderTopFlowRow(row, changeMap.get(row.symbol), changes.baseline));
+  const exitedRows = (changes.exited || []).map(renderExitedTopFlowRow);
+  body.innerHTML = [...currentRows, ...exitedRows].join('');
+}
+
+function buildTopFlowChangeMap(changes) {
+  const map = new Map();
+  for (const row of changes.entered || []) map.set(row.symbol, row);
+  for (const row of changes.rankChanged || []) map.set(row.symbol, row);
+  return map;
+}
+
+function renderTopFlowRow(row, change, baseline) {
+  return `
+    <tr>
+      <td class="metric">${escapeHtml(row.rank || '-')}</td>
+      <td><strong>${escapeHtml(row.symbol)}</strong> ${renderTopFlowBadge(change)}</td>
+      <td class="topflow-name">${escapeHtml(row.name || '-')}</td>
+      <td class="metric">${fixed(row.price)} <span class="${numberClass(row.changePct)}">${formatSignedPct(row.changePct)}</span></td>
+      <td class="metric">${fixed(row.score, 1)}</td>
+      <td class="metric">${fixed(row.momentum, 2)}</td>
+      <td class="metric">${fixed(row.daily, 2)}</td>
+      <td class="metric">${formatCompact(row.largeDeal)}</td>
+      <td class="reason">${renderTopFlowChangeNote(row, change, baseline)}</td>
+    </tr>
+  `;
+}
+
+function renderExitedTopFlowRow(row) {
+  return `
+    <tr class="topflow-exited">
+      <td class="metric">${escapeHtml(row.rank || '-')}</td>
+      <td><strong>${escapeHtml(row.symbol)}</strong> <span class="change-badge exited">${t('topFlowsExited')}</span></td>
+      <td class="topflow-name">${escapeHtml(row.name || '-')}</td>
+      <td class="metric">${fixed(row.price)} <span class="${numberClass(row.changePct)}">${formatSignedPct(row.changePct)}</span></td>
+      <td class="metric">${fixed(row.score, 1)}</td>
+      <td class="metric">${fixed(row.momentum, 2)}</td>
+      <td class="metric">${fixed(row.daily, 2)}</td>
+      <td class="metric">${formatCompact(row.largeDeal)}</td>
+      <td class="reason">${t('topFlowsExited')}</td>
+    </tr>
+  `;
+}
+
+function renderTopFlowBadge(change) {
+  if (!change) return '';
+  if (change.changeType === 'entered') {
+    return `<span class="change-badge entered">${t('topFlowsEntered')}</span>`;
+  }
+  if (change.changeType === 'rankChanged') {
+    return `<span class="change-badge moved">${t('topFlowsMoved')}</span>`;
+  }
+  return '';
+}
+
+function renderTopFlowChangeNote(row, change, baseline) {
+  if (baseline) return escapeHtml(t('topFlowsBaseline'));
+  if (!change) return `<span class="muted">${t('topFlowsNoChange')}</span>`;
+  if (change.changeType === 'entered') return escapeHtml(t('topFlowsEntered'));
+  if (change.changeType === 'rankChanged') {
+    return `${escapeHtml(t('topFlowsMoved'))}: #${escapeHtml(change.previousRank)} -> #${escapeHtml(row.rank)}`;
+  }
+  return '-';
 }
 
 function renderPricePlan(plan) {
@@ -439,6 +618,37 @@ function formatDateTime(value) {
 function fixed(value, digits = 2) {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(digits) : '-';
+}
+
+function formatSignedPct(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '-';
+  const sign = number > 0 ? '+' : '';
+  return `${sign}${number.toFixed(2)}%`;
+}
+
+function formatCompact(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '-';
+  return new Intl.NumberFormat(state.language === 'zh-CN' ? 'zh-CN' : 'en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(number);
+}
+
+function numberClass(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number === 0) return 'muted';
+  return number > 0 ? 'positive' : 'negative';
+}
+
+function topFlowsTypeText(type) {
+  return {
+    0: 'ALL',
+    1: 'NYSE',
+    2: 'NASDAQ',
+    3: 'ETF',
+  }[Number(type)] || 'ALL';
 }
 
 function escapeHtml(value) {

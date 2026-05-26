@@ -7,6 +7,13 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $out = Join-Path $root $OutputDir
 $zip = Join-Path $root $ZipPath
+$existingAppConfig = Join-Path $out "config\app.json"
+$appConfigBackup = $null
+
+if (Test-Path $existingAppConfig) {
+    $appConfigBackup = Join-Path ([System.IO.Path]::GetTempPath()) ("tradepulse-app-" + [guid]::NewGuid().ToString() + ".json")
+    Copy-Item -LiteralPath $existingAppConfig -Destination $appConfigBackup -Force
+}
 
 if (Test-Path $out) {
     Remove-Item -LiteralPath $out -Recurse -Force
@@ -46,5 +53,11 @@ if (Test-Path $zip) {
     Remove-Item -LiteralPath $zip -Force
 }
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip -Force
+
+if ($appConfigBackup -and (Test-Path $appConfigBackup)) {
+    Copy-Item -LiteralPath $appConfigBackup -Destination $appConfig -Force
+    Remove-Item -LiteralPath $appConfigBackup -Force
+    Write-Output "Restored local app config outside zip: $appConfig"
+}
 
 Write-Output "Package created: $zip"

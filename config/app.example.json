@@ -4,6 +4,7 @@
     "password": "your_password"
   },
   "monitor": {
+    "mode": "stock-list",
     "symbols": ["AAPL", "TSM", "IONQ"],
     "intervalMinutes": 5,
     "lookbackMinutes": 30,
@@ -18,6 +19,9 @@
     "pullbackTolerancePct": 0.8,
     "stopBufferPct": 1.5,
     "minConfidence": 60
+  },
+  "topFlows": {
+    "type": 0
   },
   "server": {
     "host": "127.0.0.1",

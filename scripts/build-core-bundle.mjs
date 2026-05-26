@@ -14,11 +14,13 @@ const modules = [
   ['config.js', [
     'DEFAULT_CONFIG',
     'SUPPORTED_LANGUAGES',
+    'SUPPORTED_MONITOR_MODES',
     'normalizeConfig',
     'validateConfig',
     'publicConfig',
     'normalizeSymbols',
     'normalizeLanguage',
+    'normalizeMonitorMode',
   ]],
   ['price-plan.js', [
     'buildPricePlan',

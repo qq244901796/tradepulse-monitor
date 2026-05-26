@@ -73,6 +73,7 @@
       password: '',
     },
     monitor: {
+      mode: 'stock-list',
       symbols: ['AAPL'],
       intervalMinutes: 5,
       lookbackMinutes: 30,
@@ -88,6 +89,9 @@
       stopBufferPct: 1.5,
       minConfidence: 60,
     },
+    topFlows: {
+      type: 0,
+    },
     server: {
       host: '127.0.0.1',
       port: 14587,
@@ -98,12 +102,14 @@
   };
 
   const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US'];
+  const SUPPORTED_MONITOR_MODES = ['stock-list', 'topflows'];
 
   function normalizeConfig(input) {
     const config = clone(DEFAULT_CONFIG);
     mergeObject(config, input || {});
     config.account.email = String(config.account.email || '').trim();
     config.account.password = String(config.account.password || '');
+    config.monitor.mode = normalizeMonitorMode(config.monitor.mode);
     config.monitor.symbols = normalizeSymbols(config.monitor.symbols);
     config.monitor.intervalMinutes = Number(config.monitor.intervalMinutes);
     config.monitor.lookbackMinutes = Number(config.monitor.lookbackMinutes);
@@ -114,6 +120,10 @@
     config.pricePlan.pullbackTolerancePct = Number(config.pricePlan.pullbackTolerancePct);
     config.pricePlan.stopBufferPct = Number(config.pricePlan.stopBufferPct);
     config.pricePlan.minConfidence = Number(config.pricePlan.minConfidence);
+    if (!config.topFlows || typeof config.topFlows !== 'object' || Array.isArray(config.topFlows)) {
+      config.topFlows = clone(DEFAULT_CONFIG.topFlows);
+    }
+    config.topFlows.type = Number(config.topFlows.type);
     config.server.host = String(config.server.host || DEFAULT_CONFIG.server.host);
     config.server.port = Number(config.server.port || DEFAULT_CONFIG.server.port);
     config.ui.language = normalizeLanguage(config.ui.language);
@@ -125,7 +135,12 @@
 
     if (!config.account.email) errors.push('account.email is required.');
     if (!config.account.password) errors.push('account.password is required.');
-    if (!config.monitor.symbols.length) errors.push('monitor.symbols must contain at least one symbol.');
+    if (!SUPPORTED_MONITOR_MODES.includes(config.monitor.mode)) {
+      errors.push('monitor.mode must be stock-list or topflows.');
+    }
+    if (config.monitor.mode === 'stock-list' && !config.monitor.symbols.length) {
+      errors.push('monitor.symbols must contain at least one symbol.');
+    }
     if (!Number.isFinite(config.monitor.intervalMinutes) || config.monitor.intervalMinutes < 1) {
       errors.push('monitor.intervalMinutes must be at least 1.');
     }
@@ -147,6 +162,9 @@
     if (!Number.isFinite(config.pricePlan.minConfidence) || config.pricePlan.minConfidence < 0 || config.pricePlan.minConfidence > 100) {
       errors.push('pricePlan.minConfidence must be between 0 and 100.');
     }
+    if (!Number.isFinite(config.topFlows.type) || ![0, 1, 2, 3].includes(config.topFlows.type)) {
+      errors.push('topFlows.type must be 0, 1, 2, or 3.');
+    }
     if (!Number.isInteger(config.server.port) || config.server.port < 1 || config.server.port > 65535) {
       errors.push('server.port must be a valid TCP port.');
     }
@@ -167,6 +185,7 @@
       monitor: config.monitor,
       rules: config.rules,
       pricePlan: config.pricePlan,
+      topFlows: config.topFlows,
       server: config.server,
       ui: config.ui,
     };
@@ -184,6 +203,10 @@
 
   function normalizeLanguage(language) {
     return SUPPORTED_LANGUAGES.includes(language) ? language : DEFAULT_CONFIG.ui.language;
+  }
+
+  function normalizeMonitorMode(mode) {
+    return SUPPORTED_MONITOR_MODES.includes(mode) ? mode : DEFAULT_CONFIG.monitor.mode;
   }
 
   function mergeObject(target, source) {
@@ -733,6 +756,24 @@
       pricePlanNotActionable: '\u7ee7\u7eed\u89c2\u5bdf',
       pricePlanSourceChart: 'Chart',
       pricePlanSourceExport: 'Export',
+      monitorMode: '\u76d1\u63a7\u6a21\u5f0f',
+      stockListMode: '\u80a1\u7968\u5217\u8868',
+      topFlowsMode: 'Top Flows',
+      topFlowsWatchlist: 'Top Flows \u699c\u5355',
+      topFlowsSummary: 'Top Flows \u53d8\u52a8',
+      topFlowsRows: '{value} \u6761',
+      topFlowsNoChange: '\u6682\u65e0\u699c\u5355\u53d8\u52a8',
+      topFlowsBaseline: '\u9996\u6b21\u626b\u63cf\uff0c\u5df2\u5efa\u7acb\u5bf9\u6bd4\u57fa\u7ebf',
+      topFlowsEntered: '\u65b0\u8fdb\u699c',
+      topFlowsExited: '\u79bb\u5f00\u699c\u5355',
+      topFlowsMoved: '\u540d\u6b21\u53d8\u52a8',
+      rank: '\u6392\u540d',
+      topFlowsName: '\u540d\u79f0',
+      changePct: '\u6da8\u8dcc',
+      score: 'Score',
+      momentum: 'Momentum',
+      daily: 'Daily',
+      topFlowsLargeDeal: 'Large Deal',
       pricePlanStatusREADY: '\u53ef\u6267\u884c',
       pricePlanStatusWATCH: '\u89c2\u5bdf\u4e2d',
       pricePlanStatusLOW_CONFIDENCE: '\u4fe1\u5fc3\u4e0d\u8db3',
@@ -843,7 +884,7 @@
       'log.config_reloaded': '配置已重载。',
       'log.config_reload_failed': '配置重载失败：{message}',
       'log.scan_started': '扫描开始（{trigger}）。',
-      'log.scan_finished': '扫描完成：{symbols} 个股票，用时 {durationMs}ms。',
+      'log.scan_finished': '扫描完成：{symbols} 条，用时 {durationMs}ms。',
       'log.scan_failed': '扫描失败：{message}',
       'log.export_session_expired': '导出会话已过期，正在重新登录。',
       'log.login_success': 'TradePulse 登录成功：{email}',
@@ -862,6 +903,24 @@
       pricePlanNotActionable: 'Keep watching',
       pricePlanSourceChart: 'Chart',
       pricePlanSourceExport: 'Export',
+      monitorMode: 'Monitor Mode',
+      stockListMode: 'Stock List',
+      topFlowsMode: 'Top Flows',
+      topFlowsWatchlist: 'Top Flows List',
+      topFlowsSummary: 'Top Flows Changes',
+      topFlowsRows: '{value} rows',
+      topFlowsNoChange: 'No list changes',
+      topFlowsBaseline: 'First scan; comparison baseline created',
+      topFlowsEntered: 'Entered',
+      topFlowsExited: 'Exited',
+      topFlowsMoved: 'Rank Changed',
+      rank: 'Rank',
+      topFlowsName: 'Name',
+      changePct: 'Chg.',
+      score: 'Score',
+      momentum: 'Momentum',
+      daily: 'Daily',
+      topFlowsLargeDeal: 'Large Deal',
       pricePlanStatusREADY: 'Ready',
       pricePlanStatusWATCH: 'Watching',
       pricePlanStatusLOW_CONFIDENCE: 'Low Confidence',
@@ -972,7 +1031,7 @@
       'log.config_reloaded': 'Config reloaded.',
       'log.config_reload_failed': 'Config reload failed: {message}',
       'log.scan_started': 'Scan started ({trigger}).',
-      'log.scan_finished': 'Scan finished: {symbols} symbols in {durationMs}ms.',
+      'log.scan_finished': 'Scan finished: {symbols} items in {durationMs}ms.',
       'log.scan_failed': 'Scan failed: {message}',
       'log.export_session_expired': 'Export session expired; logging in again.',
       'log.login_success': 'Logged in to TradePulse as {email}.',
@@ -1019,6 +1078,12 @@
     }
     if (/monitor\.symbols/i.test(message)) {
       return language === 'zh-CN' ? '请至少添加一个股票代码。' : 'At least one symbol is required.';
+    }
+    if (/monitor\.mode/i.test(message)) {
+      return language === 'zh-CN' ? '监控模式只能选择股票列表或 Top Flows。' : 'Monitor mode must be Stock List or Top Flows.';
+    }
+    if (/topFlows\.type/i.test(message)) {
+      return language === 'zh-CN' ? 'Top Flows 类型只能是 ALL、NYSE、NASDAQ 或 ETF。' : 'Top Flows type must be ALL, NYSE, NASDAQ, or ETF.';
     }
     return message;
   }
@@ -1072,11 +1137,13 @@
     formatNumber,
     DEFAULT_CONFIG,
     SUPPORTED_LANGUAGES,
+    SUPPORTED_MONITOR_MODES,
     normalizeConfig,
     validateConfig,
     publicConfig,
     normalizeSymbols,
     normalizeLanguage,
+    normalizeMonitorMode,
     buildPricePlan,
     normalizePriceRows,
     isTriggeredSignal,

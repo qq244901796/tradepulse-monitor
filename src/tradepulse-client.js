@@ -189,6 +189,33 @@ export class TradePulseClient {
     };
   }
 
+  async getTopFlows({ type = 0 } = {}) {
+    const query = new URLSearchParams({ type: String(type) });
+    const url = `${DATA_ORIGIN}/rank.do?${query.toString()}`;
+    const response = await this.request(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        accept: 'application/json,*/*',
+        referer: `${APP_ORIGIN}/topflows`,
+      },
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`Top Flows failed: HTTP ${response.status} ${text.slice(0, 200)}`);
+    }
+
+    const payload = JSON.parse(text);
+    if (!Array.isArray(payload)) {
+      throw new Error('Top Flows did not return an array.');
+    }
+    return {
+      url,
+      rows: payload,
+    };
+  }
+
   async request(url, options = {}) {
     const headers = new Headers(options.headers || {});
     const cookie = this.jar.getCookieHeader(url);

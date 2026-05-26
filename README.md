@@ -33,6 +33,11 @@ http://127.0.0.1:14587
 
 首次运行直接在页面里填写账号、密码、股票列表和阈值，不需要手改配置文件。
 
+1.2 起 Windows 端可以在设置里选择两种监控模式：
+
+- `股票列表`：按指定股票识别机构入场、卖压和价格计划。
+- `Top Flows`：定期读取 TradePulse Top Flows 榜单，观察新进榜、离开榜单和名次变动。
+
 ## 共享核心
 
 共享核心负责这些内容：
@@ -114,3 +119,13 @@ node .\scripts\inspect_chart.mjs
 ```text
 reports\chart-api-discovery.json
 ```
+
+## 1.2 Top Flows 数据源
+
+Top Flows 模式读取：
+
+```text
+https://data1.tradepulse.net/rank.do?type=0
+```
+
+当前 Windows 端先固定使用 `ALL` 榜单。后续如果要加 `NYSE`、`NASDAQ`、`ETF` 过滤，只需要继续扩展 `topFlows.type` 和页面选择控件。
